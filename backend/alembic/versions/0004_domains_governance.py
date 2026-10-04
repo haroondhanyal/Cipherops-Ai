@@ -4,7 +4,7 @@ from alembic import op
 from app import models  # noqa: F401
 from app.database import Base
 
-revision = "0004_domains_workflows_governance"
+revision = "0004_domains_governance"
 down_revision = "0003_alerts_telemetry_assets"
 branch_labels = None
 depends_on = None

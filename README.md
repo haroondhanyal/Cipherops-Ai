@@ -91,7 +91,9 @@ From the repository root:
 cp .env.example .env
 ```
 
-Edit `.env` and replace `POSTGRES_PASSWORD` with a private local password. Then start the database:
+Edit `.env` and replace `POSTGRES_PASSWORD` with a private local password. `POSTGRES_PORT` selects the host port (default `5432`); if another PostgreSQL server already uses it, choose a free port such as `55432`.
+
+Then start the database:
 
 ```sh
 docker compose up -d postgres
@@ -104,7 +106,7 @@ cd backend
 cp .env.example .env
 ```
 
-Edit `backend/.env`: set `DATABASE_URL` to use the same PostgreSQL password as the root `.env`, and replace `JWT_SECRET` with a random secret of at least 32 characters. Then install dependencies, migrate and start the API:
+Edit `backend/.env`: set `DATABASE_URL` to use the same PostgreSQL password and host port as the root `.env`, and replace `JWT_SECRET` with a random secret of at least 32 characters. Then install dependencies, migrate and start the API:
 
 ```sh
 python -m venv .venv
@@ -145,6 +147,7 @@ Open the Vite URL, normally `http://localhost:5173`, and sign in with the accoun
 | Variable | Location | Purpose |
 | --- | --- | --- |
 | `POSTGRES_PASSWORD` | root `.env` | Local PostgreSQL container password |
+| `POSTGRES_PORT` | root `.env` | Host port forwarded to the local PostgreSQL container (defaults to `5432`) |
 | `DATABASE_URL` | `backend/.env` | SQLAlchemy database connection; use the same password as PostgreSQL |
 | `JWT_SECRET` | `backend/.env` | Signing secret; at least 32 characters, private and unique per environment |
 | `JWT_EXPIRE_MINUTES` | `backend/.env` | Access-token lifetime; defaults to 30 minutes |
@@ -194,7 +197,7 @@ All operational endpoints are versioned under `/api/v1`. Use the interactive doc
 | Governance | `/compliance`, `/reports` | Control/evidence tracking and saved report snapshots/CSV |
 | Administration | `/admin` | User/role management and audit history |
 
-Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0004_domains_workflows_governance.py`.
+Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0004_domains_governance.py`.
 
 ## Security and operational boundaries
 
