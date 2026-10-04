@@ -346,7 +346,8 @@ def main():
             raise SystemExit("Run the API once to initialize roles first: " + ", ".join(missing))
         password_digest = hash_password(password)
         for email, name, role in DEMO_USERS:
-            if not db.scalar(select(User.id).where(User.email == email)):
+            user = db.scalar(select(User).where(User.email == email))
+            if user is None:
                 db.add(
                     User(
                         email=email,
@@ -355,6 +356,9 @@ def main():
                         roles=[roles[role]],
                     )
                 )
+            else:
+                user.password_hash = password_digest
+                user.roles = [roles[role]]
         now = datetime.now(timezone.utc)
         for index, (key, title, severity, score, status, source, asset_count, owner) in enumerate(
             INCIDENTS
@@ -432,7 +436,7 @@ def main():
         f"{len(INCIDENTS)} fictional incidents, {len(DEMO_ALERTS)} alerts, "
         f"{len(DEMO_ASSETS)} assets and {len(DEMO_ALERTS)} telemetry events."
     )
-    print("New demo accounts use the password you entered; existing accounts keep their password.")
+    print("All seeded demo accounts use the password you entered.")
     for email, _, role in DEMO_USERS:
         print(f"  {email} — {role}")
 

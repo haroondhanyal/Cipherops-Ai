@@ -255,3 +255,19 @@ The six product phases are implemented. Organization-specific integration, ident
 - [Backend setup, routes, OIDC and operations](./backend/README.md)
 - [Seven developer workstreams and request flow](./docs_DEVELOPMENT.md)
 - [Alembic migrations](./backend/alembic/versions/)
+
+## Local demo accounts
+
+For local demo sign-in, enter the account email in the **Email address** field and use this shared password:
+
+**Password:** `RWLl7aHb7xuchK2tiPY86VkJ2d47kzrc`
+
+These fictional `northstar.example` accounts are for the seeded local development database:
+
+- **SOC Analyst:** `raja.jamal@northstar.example`, `soc.analyst.02@northstar.example`, `soc.analyst.03@northstar.example`, `soc.analyst.04@northstar.example`
+- **Security Administrator:** `admin@northstar.example`, `security.admin.02@northstar.example`, `security.admin.03@northstar.example`, `security.admin.04@northstar.example`
+- **CISO:** `ciso@northstar.example`, `ciso.02@northstar.example`, `ciso.03@northstar.example`, `ciso.04@northstar.example`
+- **Cloud Security Engineer:** `amina.khan@northstar.example`, `cloud.engineer.02@northstar.example`, `cloud.engineer.03@northstar.example`, `cloud.engineer.04@northstar.example`
+- **Compliance Officer:** `sara.ali@northstar.example`, `compliance.02@northstar.example`, `compliance.03@northstar.example`, `compliance.04@northstar.example`
+
+The seed command sets this password on these 20 demo accounts only; it does not change other users.

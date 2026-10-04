@@ -16,14 +16,14 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-The API initializes built-in RBAC roles and permissions after the migration. To load the five fictional demo users, 20 demo incidents, five alerts and five assets, run this in another terminal. It prompts for one password that will be assigned to all demo users; there is no default account/password:
+The API initializes built-in RBAC roles and permissions after the migration. To load the 20 fictional demo users (four per role), 20 demo incidents, five alerts and five assets, run this in another terminal. It prompts for one password that will be assigned to all demo users; there is no default account/password:
 
 ```sh
 cd backend
 python -m app.seed_demo
 ```
 
-The demo seed creates four fictional accounts per built-in role (including Security Administrator) using the one password entered at the prompt. Re-running it adds missing demo accounts and leaves existing account passwords unchanged.
+The demo seed creates four fictional accounts per built-in role (including Security Administrator) using the one password entered at the prompt. Re-running it resets the seeded demo accounts to the password entered; non-demo accounts are not changed.
 
 For a single user, use `python -m app.cli --email analyst@example.com --name "SOC Analyst" --role "SOC Analyst"`; it prompts for a password.
 
