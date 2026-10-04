@@ -25,6 +25,7 @@ from .models import (
     SecurityFinding,
     TelemetryEvent,
     User,
+    YaraRule,
 )
 from .security import hash_password
 
@@ -416,9 +417,7 @@ def main():
                 user.roles = [roles[role]]
         analysts = db.scalars(
             select(User).where(
-                User.email.in_(
-                    ["raja.jamal@northstar.example", "admin@northstar.example"]
-                )
+                User.email.in_(["raja.jamal@northstar.example", "admin@northstar.example"])
             )
         ).all()
         actor_by_email = {user.email: user for user in analysts}
@@ -505,6 +504,7 @@ def main():
                         last_seen=now - timedelta(minutes=index * 3),
                     )
                 )
+
             if not db.scalar(
                 select(TelemetryEvent.id).where(
                     TelemetryEvent.source == source, TelemetryEvent.external_id == external_id
@@ -517,9 +517,7 @@ def main():
                         event_type=(
                             "detection"
                             if index < len(DEMO_ALERTS)
-                            else ("identity.signin", "network.connection", "cloud.audit")[
-                                index % 3
-                            ]
+                            else ("identity.signin", "network.connection", "cloud.audit")[index % 3]
                         ),
                         severity=severity,
                         summary=title,
@@ -530,6 +528,51 @@ def main():
                             if index < len(DEMO_ALERTS)
                             else {"demo": True, "latitude": 24.86, "longitude": 67.01}
                         ),
+                    )
+                )
+
+        demo_yara_rules = [
+            (
+                "Northstar_Suspicious_Cloud_Exfiltration",
+                "Detects cloud data-access and exfiltration phrases in ingested event records.",
+                """rule Northstar_Suspicious_Cloud_Exfiltration {
+  meta:
+    description = "Suspicious cloud data movement"
+    author = "Northstar SOC"
+  strings:
+    $exfil = "data exfiltration" nocase
+    $export = "database export" nocase
+  condition:
+    any of them
+}""",
+                "Critical",
+            ),
+            (
+                "Northstar_Encoded_PowerShell",
+                "Looks for common encoded PowerShell launch markers in process telemetry.",
+                """rule Northstar_Encoded_PowerShell {
+  meta:
+    description = "Encoded PowerShell command line"
+    author = "Northstar SOC"
+  strings:
+    $powershell = "powershell" nocase
+    $encoded = "-enc" nocase
+  condition:
+    $powershell and $encoded
+}""",
+                "High",
+            ),
+        ]
+        for name, description, source, severity in demo_yara_rules:
+            if not db.scalar(select(YaraRule.id).where(YaraRule.name == name)):
+                db.add(
+                    YaraRule(
+                        name=name,
+                        namespace="northstar_demo",
+                        description=description,
+                        source=source,
+                        severity=severity,
+                        created_by=analyst.id,
                     )
                 )
 

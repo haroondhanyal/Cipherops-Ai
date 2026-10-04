@@ -140,6 +140,28 @@ class DetectionRuleUpdate(BaseModel):
     enabled: bool | None = None
 
 
+class YaraRuleCreate(BaseModel):
+    name: str = Field(min_length=3, max_length=160)
+    namespace: str = Field(
+        default="default", min_length=1, max_length=120, pattern="^[A-Za-z_][A-Za-z0-9_]*$"
+    )
+    description: str = Field(default="", max_length=1000)
+    source: str = Field(min_length=20, max_length=32000)
+    severity: str = Field(default="High", pattern="^(Critical|High|Medium|Low|Informational)$")
+    enabled: bool = True
+
+
+class YaraRuleUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=3, max_length=160)
+    namespace: str | None = Field(
+        default=None, min_length=1, max_length=120, pattern="^[A-Za-z_][A-Za-z0-9_]*$"
+    )
+    description: str | None = Field(default=None, max_length=1000)
+    source: str | None = Field(default=None, min_length=20, max_length=32000)
+    severity: str | None = Field(default=None, pattern="^(Critical|High|Medium|Low|Informational)$")
+    enabled: bool | None = None
+
+
 class ThreatIntelLookup(BaseModel):
     indicator_type: str = Field(pattern="^(ip|domain|url|hash)$")
     value: str = Field(min_length=1, max_length=2048)

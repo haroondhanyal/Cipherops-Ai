@@ -1,9 +1,12 @@
 """Persistent alert, asset, and telemetry integration APIs."""
 
 import hashlib
+import json
 import secrets
+import time
 from datetime import datetime, timezone
 
+import yara
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -22,6 +25,7 @@ from ..models import (
     SecurityFinding,
     TelemetryEvent,
     User,
+    YaraRule,
 )
 from ..schemas import (
     AlertUpdate,
@@ -285,6 +289,24 @@ def ingest_telemetry(
         enabled_rules = db.scalars(
             select(DetectionRule).where(DetectionRule.enabled.is_(True))
         ).all()
+        active_yara_rules = db.scalars(
+            select(YaraRule).where(YaraRule.enabled.is_(True)).limit(50)
+        ).all()
+        compiled_yara_rules = []
+        for yara_rule in active_yara_rules:
+            try:
+                compiled_yara_rules.append(
+                    (
+                        yara_rule,
+                        yara.compile(sources={yara_rule.namespace: yara_rule.source}),
+                    )
+                )
+            except yara.Error as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Enabled YARA rule {yara_rule.name} failed compilation",
+                ) from exc
+        yara_deadline = time.monotonic() + 5
         for item in batch.events:
             event = db.scalar(
                 select(TelemetryEvent).where(
@@ -323,6 +345,36 @@ def ingest_telemetry(
                 )
                 and severity_rank[item.severity] >= severity_rank[rule.minimum_severity]
             ]
+            yara_matches = []
+            yara_text = json.dumps(
+                {
+                    "source": source,
+                    "event_type": item.event_type,
+                    "severity": item.severity,
+                    "summary": item.summary,
+                    "asset_key": asset_key,
+                    "payload": item.attributes,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            ).encode("utf-8")
+            for yara_rule, compiled_rule in compiled_yara_rules:
+                if time.monotonic() > yara_deadline:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            "Enabled YARA rules exceeded the 5 second per-batch processing limit"
+                        ),
+                    )
+                try:
+                    if compiled_rule.match(data=yara_text, timeout=1):
+                        yara_matches.append(yara_rule)
+                except yara.TimeoutError as exc:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"YARA rule {yara_rule.name} exceeded its per-event time limit",
+                    ) from exc
             if rule_matches:
                 event.payload = {
                     **(event.payload or {}),
@@ -330,8 +382,16 @@ def ingest_telemetry(
                         {"id": rule.id, "name": rule.name} for rule in rule_matches
                     ],
                 }
+            if yara_matches:
+                event.payload = {
+                    **(event.payload or {}),
+                    "yara_rule_matches": [
+                        {"id": rule.id, "name": rule.name} for rule in yara_matches
+                    ],
+                }
             rule_severity = max(
-                (rule.minimum_severity for rule in rule_matches),
+                [rule.minimum_severity for rule in rule_matches]
+                + [rule.severity for rule in yara_matches],
                 key=lambda value: severity_rank[value],
                 default="Informational",
             )
@@ -420,6 +480,9 @@ def ingest_telemetry(
             if rule_matches:
                 rule_names = ", ".join(rule.name for rule in rule_matches[:5])
                 alert_summary = f"{item.summary} · Detection rule: {rule_names}"
+            if yara_matches:
+                yara_names = ", ".join(rule.name for rule in yara_matches[:5])
+                alert_summary = f"{alert_summary} · YARA: {yara_names}"
             if matches:
                 match_names = ", ".join(
                     str(row.attributes.get("value") or row.attributes.get("indicator"))

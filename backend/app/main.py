@@ -20,6 +20,7 @@ from .routers import (
     search,
     threat_intel,
     workflows,
+    yara,
 )
 
 
@@ -212,7 +213,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[x.strip() for x in settings.cors_origins.split(",")],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
 app.add_middleware(OperationalHeadersMiddleware)
@@ -245,3 +246,4 @@ app.include_router(governance.router)
 app.include_router(search.router)
 app.include_router(hunting.router)
 app.include_router(threat_intel.router)
+app.include_router(yara.router)
