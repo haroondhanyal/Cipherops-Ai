@@ -27,6 +27,12 @@ For a single user, use `python -m app.cli --email analyst@example.com --name "SO
 
 Interactive API docs are available at `http://localhost:8000/docs`. Admin endpoints for user lifecycle, role permissions, integration management, and audit history require `admin:manage`. Users can enroll in TOTP MFA from **Settings → Security settings**; login requires the six digit code after MFA is enabled.
 
+## Signup, profile and password recovery
+
+Set `ALLOW_PUBLIC_SIGNUP=true` to show self-registration. New accounts always get the `SOC Analyst` role; administrators assign elevated roles. Signup captures a profile photo, first/last name, international calling code, mobile number, country and city. Users can edit these fields from **Settings**.
+
+Password reset tokens are random, stored only as hashes, expire after 20 minutes and can be used once. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` and `SMTP_STARTTLS` to deliver recovery links. For local testing without an email server, set `PASSWORD_RESET_DEV_MODE=true` and use a loopback `FRONTEND_URL`; only then will the API return a development reset URL. Keep that flag disabled outside local development. Successful recovery invalidates existing sessions.
+
 ## Integrations and telemetry
 
 After the migration, sign in as a Security Administrator and open **Administration → Integrations**. Create one integration per source. Its high-entropy ingestion key is shown once; store it in the source's secret manager. The generated cURL example posts up to 500 normalized events to `POST /api/v1/telemetry/ingest` with `X-Ingestion-Key`. Each event has a source `external_id`, `event_type`, severity, summary, optional timestamp, optional asset, and source-specific `attributes`. Repeated `(integration, external_id)` events update the existing telemetry record; detections create or refresh a deduplicated alert. Asset identifiers upsert the persistent inventory. Revoke a key from the Integrations screen if it is exposed or no longer needed.

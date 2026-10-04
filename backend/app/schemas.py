@@ -9,6 +9,63 @@ class LoginRequest(BaseModel):
     mfa_code: str | None = Field(default=None, pattern="^\\d{6}$")
 
 
+class RegistrationRequest(BaseModel):
+    email: EmailStr
+    first_name: str = Field(min_length=1, max_length=75)
+    last_name: str = Field(min_length=1, max_length=75)
+    phone_country: str = Field(pattern="^[A-Z]{2}$")
+    phone_dial_code: str = Field(pattern="^\\+[1-9]\\d{0,3}$")
+    mobile_number: str = Field(pattern="^\\d{6,15}$")
+    country_code: str = Field(pattern="^[A-Z]{2}$")
+    country: str = Field(min_length=2, max_length=100)
+    city: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=12, max_length=256)
+    confirm_password: str = Field(min_length=12, max_length=256)
+    avatar_data: str | None = Field(
+        default=None,
+        max_length=400_000,
+        pattern="^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$",
+    )
+
+    @model_validator(mode="after")
+    def validate_password_confirmation(self):
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match")
+        return self
+
+
+class UserProfileUpdate(BaseModel):
+    first_name: str = Field(min_length=1, max_length=75)
+    last_name: str = Field(min_length=1, max_length=75)
+    phone_country: str = Field(pattern="^[A-Z]{2}$")
+    phone_dial_code: str = Field(pattern="^\\+[1-9]\\d{0,3}$")
+    mobile_number: str = Field(pattern="^\\d{6,15}$")
+    country_code: str = Field(pattern="^[A-Z]{2}$")
+    country: str = Field(min_length=2, max_length=100)
+    city: str = Field(min_length=1, max_length=120)
+    avatar_data: str | None = Field(
+        default=None,
+        max_length=400_000,
+        pattern="^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$",
+    )
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=24, max_length=128)
+    password: str = Field(min_length=12, max_length=256)
+    confirm_password: str = Field(min_length=12, max_length=256)
+
+    @model_validator(mode="after")
+    def validate_password_confirmation(self):
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match")
+        return self
+
+
 class MfaCode(BaseModel):
     code: str = Field(pattern="^\\d{6}$")
 
@@ -187,6 +244,15 @@ class UserView(BaseModel):
     id: int
     email: str
     full_name: str
+    first_name: str
+    last_name: str
+    phone_country: str | None = None
+    phone_dial_code: str | None = None
+    mobile_number: str | None = None
+    country_code: str | None = None
+    country: str | None = None
+    city: str | None = None
+    avatar_data: str | None = None
     roles: list[str]
     permissions: list[str]
 

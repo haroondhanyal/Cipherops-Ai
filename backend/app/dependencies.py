@@ -22,9 +22,10 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
-        subject = jwt.decode(
+        claims = jwt.decode(
             credentials.credentials, settings.jwt_secret, algorithms=[ALGORITHM]
-        ).get("sub")
+        )
+        subject = claims.get("sub")
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
     try:
@@ -39,6 +40,8 @@ def get_current_user(
     )
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User is unavailable")
+    if claims.get("ver", 0) != user.session_version:
+        raise HTTPException(status_code=401, detail="Session expired; sign in again")
     return user
 
 

@@ -44,6 +44,7 @@ CipherOps AI is a full-stack security operations center (SOC) workspace. The fro
 | Response workflows | Separate-operator approval gates, manual playbook checklists and cross-incident automation history |
 | Governance | Compliance controls and evidence, point-in-time report snapshots and CSV downloads |
 | Identity and access | JWT sessions, role-based access control (RBAC), optional TOTP MFA and optional OIDC SSO |
+| Account self-service | Optional signup with profile photo/details, password visibility controls, password recovery and profile editing |
 | Operations | Audit history, API liveness/readiness endpoints, baseline security response headers and role-aware global search |
 
 The app shell and page modules are separate from shared API helpers. The backend is organized into route modules. Seven workstreams and shared-contract rules are documented in [docs_DEVELOPMENT.md](./docs_DEVELOPMENT.md).
@@ -106,7 +107,7 @@ cd backend
 cp .env.example .env
 ```
 
-Edit `backend/.env`: set `DATABASE_URL` to use the same PostgreSQL password and host port as the root `.env`, and replace `JWT_SECRET` with a random secret of at least 32 characters. Then install dependencies, migrate and start the API:
+Edit `backend/.env`: set `DATABASE_URL` to use the same PostgreSQL password and host port as the root `.env`, and replace `JWT_SECRET` with a random secret of at least 32 characters. Set `ALLOW_PUBLIC_SIGNUP=true` to enable signup. For local password reset without an email provider, set `PASSWORD_RESET_DEV_MODE=true` and keep `FRONTEND_URL` on localhost. Then install dependencies, migrate and start the API:
 
 ```sh
 python -m venv .venv
@@ -155,6 +156,9 @@ Open the Vite URL, normally `http://localhost:5173`, and sign in with the accoun
 | `VITE_API_URL` | root `.env` | Frontend API base URL; defaults to local API |
 | `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI` | `backend/.env` | Optional company OIDC configuration; all four values are needed to enable SSO |
 | `FRONTEND_URL` | `backend/.env` | Frontend return URL after successful SSO |
+| `ALLOW_PUBLIC_SIGNUP` | `backend/.env` | Enables registration; new accounts always receive the least-privileged `SOC Analyst` role |
+| `PASSWORD_RESET_DEV_MODE` | `backend/.env` | Returns a reset link only when the configured frontend is loopback; local development only |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_STARTTLS` | `backend/.env` | Optional mail delivery for password recovery |
 
 Never commit populated `.env` files, integration keys, JWT secrets or provider credentials. The supplied `.env.example` files contain placeholders only.
 
@@ -181,13 +185,17 @@ Analysts triage alerts, promote detections to incidents, assign owners and add n
 
 Use the top-bar search or `⌘K` / `Ctrl+K` to find incidents, alerts, assets and findings. Results are permission-aware and open the matching record view. The status line checks API and database readiness; the alert bell and incident count use live summary values.
 
+### Create and manage an account
+
+When public signup is enabled, the login screen offers photo upload, first/last name, international phone country code, country and city. Users can edit these details under **Settings**. New accounts receive only `SOC Analyst`; administrators assign elevated roles. Password recovery sends a short-lived, single-use link through configured SMTP. Local development may enable `PASSWORD_RESET_DEV_MODE` to show a loopback-only reset link without mail.
+
 ## API overview
 
 All operational endpoints are versioned under `/api/v1`. Use the interactive docs at `/docs` for request and response schemas.
 
 | API area | Route group | Purpose |
 | --- | --- | --- |
-| Identity | `/auth` | Login, current user, TOTP MFA and optional OIDC SSO |
+| Identity | `/auth` | Login, registration, profile, password recovery, TOTP MFA and optional OIDC SSO |
 | Workspace search | `/search` | Search permitted incidents, alerts, assets and findings |
 | Incidents | `/incidents` | Incident lifecycle, notes, evidence, analysis and response approvals |
 | Alerts and assets | `/alerts`, `/assets` | Alert triage and asset inventory |
@@ -197,11 +205,12 @@ All operational endpoints are versioned under `/api/v1`. Use the interactive doc
 | Governance | `/compliance`, `/reports` | Control/evidence tracking and saved report snapshots/CSV |
 | Administration | `/admin` | User/role management and audit history |
 
-Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0004_domains_governance.py`.
+Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0005_account_profile_recovery.py`.
 
 ## Security and operational boundaries
 
 - JWT authentication, RBAC, audit logging, optional TOTP MFA and optional OIDC authorization-code flow with PKCE are implemented.
+- Public signup is opt-in and grants only `SOC Analyst`; elevated roles remain administrator-managed. Password recovery stores only a token hash, uses single-use expiring links and invalidates previous sessions after a reset.
 - OIDC users must already exist in CipherOps. The provider needs a matching callback URL and verified identity claims; users with CipherOps MFA enabled must receive the expected MFA claim.
 - Integration ingestion keys are generated for each source and shown once. Revoke compromised or retired keys from the Integrations screen.
 - Incident response approvals prevent an operator from approving their own request. Approval records and playbook checklists do not themselves execute containment.
