@@ -14,7 +14,7 @@
 
 # CipherOps AI
 
-CipherOps AI is a full-stack security operations center (SOC) workspace. The frontend is built with React, TypeScript and Vite. The API uses FastAPI, SQLAlchemy and PostgreSQL, with Alembic migrations. The product covers six implementation phases, from identity and incident operations through telemetry, response workflows and governance.
+CipherOps AI is a full-stack security operations center (SOC) workspace. The frontend is built with React, TypeScript and Vite. The API uses FastAPI, SQLAlchemy and PostgreSQL, with Alembic migrations. The product covers six implementation phases and three advanced delivery waves, from identity and incident operations through telemetry, response workflows, YARA detection and governance.
 
 > **Deployment note:** the repository provides source-neutral integration APIs and optional OpenID Connect (OIDC). Production use still needs organization-owned identity-provider configuration, live security-source collectors, deployment secrets and infrastructure controls.
 
@@ -25,6 +25,7 @@ CipherOps AI is a full-stack security operations center (SOC) workspace. The fro
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
 - [Main workflows](#main-workflows)
+- [Screen-by-screen guide](#screen-by-screen-guide)
 - [API overview](#api-overview)
 - [Security and operational boundaries](#security-and-operational-boundaries)
 - [Development checks](#development-checks)
@@ -195,6 +196,61 @@ Use the top-bar search or `⌘K` / `Ctrl+K` to find incidents, alerts, assets an
 ### Create and manage an account
 
 When public signup is enabled, the login screen offers photo upload, first/last name, international phone country code, country, city and five icon-based domain-role requests. Users can edit profile details under **Settings**; administrators approve role requests from **Users**. Password recovery sends a short-lived, single-use link through configured SMTP. Local development may enable `PASSWORD_RESET_DEV_MODE` to show a loopback-only reset link without mail.
+
+## Screen-by-screen guide
+
+This guide describes all screens reachable from the application navigation and the account flows shown before sign-in. Actions that change data are available only when the signed-in user's permissions allow them; read-only roles can view the records their role grants access to. Screenshot links point to representative demo images in [Screenshots](#screenshots); the gallery does not include a capture for every screen.
+
+### Sign-in and account access
+
+| Screen | What it contains and lets you do | Screenshot |
+| --- | --- | --- |
+| Sign in | Sign in with email and password; toggle password visibility; optionally remember the browser; enter a TOTP code when MFA is enabled; open password recovery or signup. Company SSO appears when OIDC is configured. | — |
+| Sign up | When public signup is enabled, create an account with avatar, name, email, international calling code and mobile number, country, city, password and confirmation. Choose from five domain-role requests. New users receive SOC Analyst access until an administrator reviews a different role request. | — |
+| Forgot / reset password | Request a short-lived, single-use password-reset link and set/confirm a replacement password. SMTP is used when configured; loopback-only development mode can show a local reset link. | — |
+
+### Operations
+
+| Screen | What it contains and lets you do | Screenshot |
+| --- | --- | --- |
+| Dashboard | Review incident and alert posture, risk counts, telemetry activity for the last 24 hours, source-provided map locations, recent priority incidents and a deterministic analyst summary. Export incident and telemetry rows to CSV. Values refresh from the API periodically. | [Dashboard](./docs/screenshots/dashboard.jpg) |
+| Incidents | Search and filter incident records by severity/status, create incidents and export the visible list to CSV. Select a row to open its incident workspace. | [Incident queue](./docs/screenshots/incidents.jpg) |
+| Incident detail | Work across **Overview**, **Timeline**, **AI Analysis**, **Evidence** and **Response Plan**. Update status/owner, add notes and @mentions, attach evidence references, review activity, request sensitive response actions and review/approve playbook steps. Mentions are stored with notes; notifications are not sent. | [Incident examples](./docs/screenshots/incidents.jpg) |
+| Alerts | Triage the alert queue: search, change alert status, assign an analyst and promote an alert into an incident. It refreshes periodically and shows source, asset, assignee and last-seen context. | [Alert queue](./docs/screenshots/alerts.jpg) |
+| Threat Intelligence | Review curated IOC findings with confidence and severity, add indicators when permitted, change status and export rows. Analysts can request a manual VirusTotal lookup when configured and after acknowledging possible external sharing. | [Threat indicators](./docs/screenshots/threat-intelligence.jpg) |
+| Threat Hunting | Search normalized telemetry by text, source ID, event type, asset or indicator; inspect severity, IOC/rule matches and event time; save a personal query for reuse. Saved hunts can be rerun or removed. | — |
+| Assets | Search the normalized inventory and review provider, environment, region, owner, business criticality, risk and last-seen time. Inventory refreshes periodically from ingested telemetry. | [Asset inventory](./docs/screenshots/assets.jpg) |
+
+### Security engineering and domain findings
+
+| Screen | What it contains and lets you do | Screenshot |
+| --- | --- | --- |
+| Detection Rules | Define simple telemetry conditions using event type, minimum severity and optional summary substring. Simulate against stored telemetry and enable/disable rules; enabled matches create or update alerts during ingestion. This format is separate from Sigma and YARA. | — |
+| YARA Rules | Author, edit, compile-check, enable/disable, simulate and delete native YARA rules. Simulation checks up to 500 recent telemetry records and shows matched strings. Enabled rules run against telemetry at ingest and can create alerts at configured severity. This version scans normalized event data, not endpoint file contents. | [YARA workbench](./docs/screenshots/yara-rules.jpg) |
+| Cloud Security | Review normalized cloud findings with severity, risk, affected asset, owner and source. Search, triage status when permitted, and export findings. | [Cloud findings](./docs/screenshots/cloud-security.jpg) |
+| Identity Security | Review identity findings such as risky accounts, sign-ins and permissions in the normalized finding queue; search, triage and export. | [Identity findings](./docs/screenshots/identity-security.jpg) |
+| Vulnerabilities | Review vulnerability findings, risk scores, affected assets, ownership and source; search, triage status when permitted, and export. | [Vulnerability findings](./docs/screenshots/vulnerabilities.jpg) |
+| AI Agent Security | Review normalized AI-agent findings, including severity, risk, affected asset and source; search, triage and export. | [AI-agent findings](./docs/screenshots/ai-agent-security.jpg) |
+
+### Governance and response
+
+| Screen | What it contains and lets you do | Screenshot |
+| --- | --- | --- |
+| Compliance | Review ISO 27001, SOC 2, NIST CSF and CIS controls, framework coverage, status, owner and evidence count. Permitted users can update control status and attach an evidence reference. | [Compliance](./docs/screenshots/compliance.jpg) |
+| Reports | Generate and save executive, incident, asset-risk and compliance snapshots. Executive reports offer 7–365 day windows, resolution-time metrics, risk/compliance summaries and daily incident/alert trends. Preview saved snapshots and download CSV. | [Reports](./docs/screenshots/reports.jpg) |
+| Automation | Request a playbook run for an incident, review run history and approval state, approve/reject as a separate authorized reviewer, then complete a manual checklist or generate an audited dry-run plan. Dry-runs contact no external systems and apply no containment. | [Automation](./docs/screenshots/automation.jpg) |
+
+### Administration and account settings
+
+| Screen | What it contains and lets you do | Screenshot |
+| --- | --- | --- |
+| Users | Create users, assign available roles, approve role requests by changing the assigned role, and activate/deactivate accounts. | [User administration](./docs/screenshots/admin.jpg) |
+| Roles | Inspect role descriptions and permission keys. Permission definitions are managed through backend role configuration, not edited in this screen. | [Administration example](./docs/screenshots/admin.jpg) |
+| Audit Logs | Review actor, action, resource and timestamp entries for auditable workspace changes. | [Audit log](./docs/screenshots/audit-logs.jpg) |
+| Integrations | Create source-specific ingestion credentials, copy the one-time key/cURL example, revoke or reactivate keys, and inspect connector freshness, ingest counts and last diagnostic error. | [Integrations](./docs/screenshots/integrations.jpg) |
+| Settings | Edit profile photo, name, mobile number, country and city; set up or disable TOTP MFA; inspect company SSO configuration status. The shared shell also provides global search, API/database readiness, active-alert status and sign-out. | — |
+
+The shared top-bar search finds permitted incidents, alerts, assets and findings; it does not search every rule or configuration record. Navigation and write controls are permission-gated in the UI, and API authorization is enforced server-side.
 
 ## API overview
 
