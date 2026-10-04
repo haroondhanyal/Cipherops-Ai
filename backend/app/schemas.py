@@ -285,6 +285,7 @@ class ControlEvidenceCreate(BaseModel):
 class ReportCreate(BaseModel):
     report_type: str = Field(pattern="^(executive|incident|compliance|asset-risk)$")
     title: str = Field(min_length=3, max_length=240)
+    period_days: int = Field(default=30, ge=7, le=365)
 
 
 class UserView(BaseModel):

@@ -53,6 +53,74 @@ def action_view(action: ResponseAction, requesters: dict[int, str], deciders: di
     }
 
 
+def simulate_playbook_run(run: PlaybookRun, actor: User, db: Session) -> dict:
+    if run.status != "Approved":
+        raise HTTPException(status_code=409, detail="Only an approved playbook can be dry-run")
+    incident = db.get(Incident, run.incident_id)
+    book = db.get(ResponsePlaybook, run.playbook_id)
+    if not incident or not book:
+        raise HTTPException(
+            status_code=409, detail="The incident or playbook is no longer available"
+        )
+    targets = sorted(
+        {
+            asset_key
+            for asset_key in db.scalars(
+                select(Alert.asset_key).where(
+                    Alert.incident_id == incident.id, Alert.asset_key.is_not(None)
+                )
+            ).all()
+            if asset_key
+        }
+    )
+    adapter = {
+        "cloud_exposure": "cloud provider",
+        "identity_compromise": "identity provider",
+        "vulnerability_remediation": "endpoint or vulnerability manager",
+    }.get(book.key, "an approved response connector")
+    plan = {
+        "mode": "dry-run",
+        "will_execute": False,
+        "external_systems_contacted": False,
+        "adapter_required_for_live_execution": adapter,
+        "incident_key": incident.incident_key,
+        "target_assets": targets,
+        "planned_steps": [
+            {"step": step, "state": "planned", "executed": False} for step in book.steps
+        ],
+        "notice": "Preview only: no cloud, identity, network or endpoint changes were sent.",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    run.status = "Simulated"
+    run.execution_mode = "Dry-run plan only"
+    run.execution_result = plan
+    run.executed_by = actor.id
+    run.executed_at = datetime.now(timezone.utc)
+    db.add(
+        IncidentEvent(
+            incident_id=incident.id,
+            actor_id=actor.id,
+            event_type="action",
+            title=f"Dry-run plan generated: {book.name}",
+            detail=f"Preview only; no external action executed. Run #{run.id}.",
+        )
+    )
+    db.add(
+        AuditLog(
+            actor_id=actor.id,
+            action="playbook.dry_run_generated",
+            resource=f"{incident.incident_key}:{run.id}",
+        )
+    )
+    db.commit()
+    return {
+        "id": run.id,
+        "status": run.status,
+        "execution_mode": run.execution_mode,
+        "result": plan,
+    }
+
+
 @router.get("/incidents/{incident_key}/evidence")
 def list_evidence(
     incident_key: str,
@@ -249,6 +317,8 @@ def list_playbook_runs(
             "steps": book.steps,
             "status": run.status,
             "execution_mode": run.execution_mode,
+            "execution_result": run.execution_result,
+            "executed_at": run.executed_at,
             "approval_note": run.approval_note,
             "created_at": run.created_at,
         }
@@ -372,6 +442,20 @@ def complete_manual_playbook(
     return {"id": run.id, "status": run.status, "execution_mode": run.execution_mode}
 
 
+@router.post("/incidents/{incident_key}/playbook-runs/{run_id}/dry-run")
+def dry_run_incident_playbook(
+    incident_key: str,
+    run_id: int,
+    actor: User = Depends(require_permission("incidents:manage")),
+    db: Session = Depends(get_db),
+):
+    incident = incident_or_404(db, incident_key)
+    run = db.scalar(select(PlaybookRun).where(PlaybookRun.id == run_id).with_for_update())
+    if not run or run.incident_id != incident.id:
+        raise HTTPException(status_code=404, detail="Playbook run not found")
+    return simulate_playbook_run(run, actor, db)
+
+
 @router.get("/incidents/{incident_key}/analysis")
 def incident_analysis(
     incident_key: str,
@@ -452,6 +536,8 @@ def list_automation_runs(
             "steps": book.steps,
             "status": run.status,
             "execution_mode": run.execution_mode,
+            "execution_result": run.execution_result,
+            "executed_at": run.executed_at,
             "approval_note": run.approval_note,
             "created_at": run.created_at,
         }
@@ -571,3 +657,15 @@ def complete_automation_run(
     )
     db.commit()
     return {"id": run.id, "status": run.status, "execution_mode": run.execution_mode}
+
+
+@router.post("/automation/runs/{run_id}/dry-run")
+def dry_run_automation(
+    run_id: int,
+    actor: User = Depends(require_permission("incidents:manage")),
+    db: Session = Depends(get_db),
+):
+    run = db.scalar(select(PlaybookRun).where(PlaybookRun.id == run_id).with_for_update())
+    if not run:
+        raise HTTPException(status_code=404, detail="Automation run not found")
+    return simulate_playbook_run(run, actor, db)

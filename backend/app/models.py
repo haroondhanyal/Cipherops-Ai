@@ -316,6 +316,11 @@ class PlaybookRun(Base):
     status: Mapped[str] = mapped_column(String(24), default="Pending approval", index=True)
     approval_note: Mapped[str] = mapped_column(String(2000), default="")
     execution_mode: Mapped[str] = mapped_column(String(40), default="Manual checklist")
+    execution_result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    executed_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
     )

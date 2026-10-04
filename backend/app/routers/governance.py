@@ -2,11 +2,13 @@
 
 import csv
 import io
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+from statistics import mean, median
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -18,8 +20,10 @@ from ..models import (
     ComplianceControl,
     ControlEvidence,
     Incident,
+    IncidentEvent,
     ReportSnapshot,
     SecurityFinding,
+    TelemetryEvent,
     User,
 )
 from ..schemas import ComplianceControlUpdate, ControlEvidenceCreate, ReportCreate
@@ -27,42 +31,236 @@ from ..schemas import ComplianceControlUpdate, ControlEvidenceCreate, ReportCrea
 router = APIRouter(prefix="/api/v1", tags=["governance"])
 
 
-def snapshot_data(report_type: str, db: Session) -> dict:
-    now = datetime.now(timezone.utc).isoformat()
+def flatten_report(data: dict) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+
+    def walk(value, path: str):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == "items":
+                    continue
+                walk(child, f"{path}.{key}" if path else key)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                identity = child.get("date", index) if isinstance(child, dict) else index
+                walk(child, f"{path}.{identity}")
+        elif value is not None:
+            rows.append({"field": path, "value": str(value)})
+
+    walk(data, "")
+    return rows
+
+
+def csv_safe(value: object) -> str:
+    text_value = str(value if value is not None else "")
+    if text_value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")):
+        return "'" + text_value
+    return text_value
+
+
+def snapshot_data(report_type: str, db: Session, period_days: int = 30) -> dict:
+    generated = datetime.now(timezone.utc)
+    now = generated.isoformat()
     if report_type == "executive":
-        return {
-            "generated_at": now,
-            "incidents": {
-                status: db.scalar(
-                    select(func.count()).select_from(Incident).where(Incident.status == status)
+        cutoff = generated - timedelta(days=period_days)
+        statuses = (
+            "New",
+            "Triaged",
+            "Acknowledged",
+            "Investigating",
+            "Contained",
+            "Resolved",
+            "Closed",
+        )
+        status_counts = {
+            status: db.scalar(
+                select(func.count()).select_from(Incident).where(Incident.status == status)
+            )
+            or 0
+            for status in statuses
+        }
+        daily = {
+            (generated - timedelta(days=offset)).date().isoformat(): {
+                "date": (generated - timedelta(days=offset)).date().isoformat(),
+                "incidents_opened": 0,
+                "incidents_resolved": 0,
+                "alerts_created": 0,
+            }
+            for offset in reversed(range(period_days))
+        }
+        period_incident_dates = db.scalars(
+            select(Incident.created_at).where(Incident.created_at >= cutoff)
+        ).all()
+        for stamp in period_incident_dates:
+            if stamp.tzinfo is None:
+                stamp = stamp.replace(tzinfo=timezone.utc)
+            day = stamp.date().isoformat()
+            if day in daily:
+                daily[day]["incidents_opened"] += 1
+        period_alert_dates = db.scalars(
+            select(Alert.created_at).where(Alert.created_at >= cutoff)
+        ).all()
+        for stamp in period_alert_dates:
+            if stamp.tzinfo is None:
+                stamp = stamp.replace(tzinfo=timezone.utc)
+            day = stamp.date().isoformat()
+            if day in daily:
+                daily[day]["alerts_created"] += 1
+
+        transition_ids = db.scalars(
+            select(IncidentEvent.incident_id)
+            .where(
+                IncidentEvent.event_type == "action",
+                IncidentEvent.created_at >= cutoff,
+                or_(
+                    IncidentEvent.detail.ilike("%status: Resolved%"),
+                    IncidentEvent.detail.ilike("%status: Closed%"),
+                ),
+            )
+            .distinct()
+        ).all()
+        closed = db.scalars(
+            select(Incident).where(
+                Incident.status.in_(["Resolved", "Closed"]),
+                or_(Incident.updated_at >= cutoff, Incident.id.in_(transition_ids)),
+            )
+        ).all()
+        resolved_total = (
+            db.scalar(
+                select(func.count())
+                .select_from(Incident)
+                .where(Incident.status.in_(["Resolved", "Closed"]))
+            )
+            or 0
+        )
+        closed_ids = [row.id for row in closed]
+        resolution_events = (
+            db.scalars(
+                select(IncidentEvent)
+                .where(
+                    IncidentEvent.incident_id.in_(closed_ids), IncidentEvent.event_type == "action"
                 )
-                or 0
-                for status in (
-                    "New",
-                    "Triaged",
-                    "Acknowledged",
-                    "Investigating",
-                    "Contained",
-                    "Resolved",
-                    "Closed",
-                )
-            },
-            "alerts_open": db.scalar(
+                .order_by(IncidentEvent.created_at.asc())
+            ).all()
+            if closed_ids
+            else []
+        )
+        resolved_at: dict[int, datetime] = {}
+        for event in resolution_events:
+            if (
+                "status: resolved" in event.detail.casefold()
+                or "status: closed" in event.detail.casefold()
+            ):
+                resolved_at[event.incident_id] = event.created_at
+        resolution_hours = []
+        resolution_by_severity: dict[str, list[float]] = defaultdict(list)
+        for incident in closed:
+            finished = resolved_at.get(incident.id, incident.updated_at)
+            start = incident.created_at
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            if finished.tzinfo is None:
+                finished = finished.replace(tzinfo=timezone.utc)
+            if finished < cutoff:
+                continue
+            elapsed = (finished - start).total_seconds() / 3600
+            if elapsed >= 0:
+                resolution_hours.append(elapsed)
+                resolution_by_severity[incident.severity].append(elapsed)
+            day = finished.date().isoformat()
+            if day in daily:
+                daily[day]["incidents_resolved"] += 1
+        total_open_alerts = (
+            db.scalar(
                 select(func.count())
                 .select_from(Alert)
                 .where(Alert.status.not_in(["Resolved", "Suppressed"]))
             )
-            or 0,
-            "critical_assets": db.scalar(
+            or 0
+        )
+        critical_assets = (
+            db.scalar(
                 select(func.count()).select_from(Asset).where(Asset.criticality == "Critical")
             )
-            or 0,
-            "high_risk_findings": db.scalar(
+            or 0
+        )
+        high_risk_findings = (
+            db.scalar(
                 select(func.count())
                 .select_from(SecurityFinding)
                 .where(SecurityFinding.risk_score >= 70, SecurityFinding.status != "Resolved")
             )
-            or 0,
+            or 0
+        )
+        controls = db.scalars(select(ComplianceControl)).all()
+        frameworks: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "compliant": 0})
+        for control in controls:
+            frameworks[control.framework]["total"] += 1
+            frameworks[control.framework]["compliant"] += int(
+                control.status in {"Compliant", "Not applicable"}
+            )
+        framework_scores = {
+            name: round(item["compliant"] * 100 / item["total"]) if item["total"] else 0
+            for name, item in sorted(frameworks.items())
+        }
+        telemetry_volume = (
+            db.scalar(
+                select(func.count())
+                .select_from(TelemetryEvent)
+                .where(TelemetryEvent.received_at >= cutoff)
+            )
+            or 0
+        )
+        severity_counts = {
+            severity: db.scalar(
+                select(func.count())
+                .select_from(Incident)
+                .where(
+                    Incident.severity == severity, Incident.status.not_in(["Resolved", "Closed"])
+                )
+            )
+            or 0
+            for severity in ("Critical", "High", "Medium", "Low")
+        }
+        avg_open_risk = db.scalar(
+            select(func.avg(Incident.risk_score)).where(
+                Incident.status.not_in(["Resolved", "Closed"])
+            )
+        )
+        return {
+            "generated_at": now,
+            "period_days": period_days,
+            "period_started_at": cutoff.isoformat(),
+            "incidents": status_counts,
+            "incidents_opened_in_period": len(period_incident_dates),
+            "incidents_resolved_total": resolved_total,
+            "incidents_resolved_in_period": len(resolution_hours),
+            "resolution_time_hours": {
+                "mean": round(mean(resolution_hours), 2) if resolution_hours else None,
+                "median": round(median(resolution_hours), 2) if resolution_hours else None,
+                "sample_size": len(resolution_hours),
+                "basis": (
+                    "Incident creation to first recorded Resolved/Closed status; "
+                    "updated_at fallback when no transition event exists."
+                ),
+            },
+            "resolution_time_hours_by_severity": {
+                severity: {
+                    "mean": round(mean(values), 2),
+                    "sample_size": len(values),
+                }
+                for severity, values in sorted(resolution_by_severity.items())
+            },
+            "open_incidents_by_severity": severity_counts,
+            "average_open_incident_risk_score": round(float(avg_open_risk), 2)
+            if avg_open_risk is not None
+            else None,
+            "alerts_open": total_open_alerts,
+            "critical_assets": critical_assets,
+            "high_risk_findings": high_risk_findings,
+            "telemetry_events_in_period": telemetry_volume,
+            "compliance_framework_scores": framework_scores,
+            "daily_trends": list(daily.values()),
         }
     if report_type == "incident":
         rows = db.scalars(select(Incident).order_by(Incident.created_at.desc()).limit(500)).all()
@@ -276,7 +474,7 @@ def list_reports(
             "report_type": r.report_type,
             "title": r.title,
             "created_at": r.created_at,
-            "row_count": len(r.data.get("items", [key for key in r.data if key != "generated_at"])),
+            "row_count": len(r.data["items"]) if "items" in r.data else len(flatten_report(r.data)),
         }
         for r in rows
     ]
@@ -292,7 +490,7 @@ def create_report(
         report_type=payload.report_type,
         title=payload.title.strip(),
         created_by=actor.id,
-        data=snapshot_data(payload.report_type, db),
+        data=snapshot_data(payload.report_type, db, payload.period_days),
     )
     db.add(snapshot)
     db.flush()
@@ -338,14 +536,12 @@ def download_report(
     data = report.data
     rows = data.get("items")
     if rows is None:
-        rows = [
-            {"metric": key, "value": value} for key, value in data.items() if key != "generated_at"
-        ]
+        rows = flatten_report(data)
     output = io.StringIO()
     if rows:
         writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()), extrasaction="ignore")
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows([{key: csv_safe(value) for key, value in row.items()} for row in rows])
     db.add(AuditLog(actor_id=actor.id, action="report.downloaded", resource=str(report.id)))
     db.commit()
     filename = f"cipherops-{report.report_type}-{report.id}.csv"

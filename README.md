@@ -44,8 +44,8 @@ CipherOps AI is a full-stack security operations center (SOC) workspace. The fro
 | Threat intelligence enrichment | Analyst-triggered VirusTotal reputation lookup for IPs, domains, URLs and file hashes |
 | Threat hunting | Search normalized telemetry and IOC/rule matches; save personal hunt queries for reuse |
 | Detection engineering | Author event type, severity and summary match rules; simulate against stored telemetry and alert on ingest matches |
-| Response workflows | Separate-operator approval gates, manual playbook checklists and cross-incident automation history |
-| Governance | Compliance controls and evidence, point-in-time report snapshots and CSV downloads |
+| Response workflows | Separate-operator approval gates, manual checklists and audited no-side-effect dry-run plans |
+| Governance | Compliance controls/evidence, executive incident/alert trends, resolution-time metrics and structured CSV snapshots |
 | Identity and access | JWT sessions, role-based access control (RBAC), optional TOTP MFA and optional OIDC SSO |
 | Account self-service | Optional signup with profile photo/details, password visibility controls, password recovery and profile editing |
 | Operations | Audit history, API liveness/readiness, integration ingest health/diagnostics and role-aware global search |
@@ -210,11 +210,11 @@ All operational endpoints are versioned under `/api/v1`. Use the interactive doc
 | Telemetry and integrations | `/telemetry`, `/integrations` | Ingestion, integration-key lifecycle and operational summaries |
 | Threat intelligence enrichment | `/threat-intel` | Manual VirusTotal lookups with explicit acknowledgement before external sharing |
 | Security domains | `/findings` | Normalized domain findings and threat indicators |
-| Response workflows | `/automation`, incident playbook routes | Approval-gated manual automation/playbook history |
-| Governance | `/compliance`, `/reports` | Control/evidence tracking and saved report snapshots/CSV |
+| Response workflows | `/automation`, incident playbook routes | Approval-gated playbook history and audited dry-run response plans |
+| Governance | `/compliance`, `/reports` | Control/evidence tracking, period-based executive metrics/trends and CSV snapshots |
 | Administration | `/admin` | User/role management and audit history |
 
-Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0008_integration_health.py`.
+Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0009_response_simulation.py`.
 
 ## Security and operational boundaries
 
@@ -223,6 +223,7 @@ Route-level permission keys are enforced server-side. UI visibility does not rep
 - OIDC users must already exist in CipherOps. The provider needs a matching callback URL and verified identity claims; users with CipherOps MFA enabled must receive the expected MFA claim.
 - Integration ingestion keys are generated for each source and shown once. Revoke compromised or retired keys from the Integrations screen.
 - Incident response approvals prevent an operator from approving their own request. Approval records and playbook checklists do not themselves execute containment.
+- Approved playbook runs can generate an audited dry-run plan with linked asset context. It contacts no cloud, identity, network or endpoint service and sends no response action. Live action adapters require separately configured provider credentials and review.
 - Threat correlation is exact IOC-value matching after normalization; it is not an external feed subscription, reputation lookup or fuzzy domain/IP matching service.
 - VirusTotal enrichment is optional and manual. VirusTotal documents that queried IoCs are added to its dataset and may be available to its community; the UI requires analyst acknowledgement and warns against confidential, sensitive or personal data. See [VirusTotal domain report and data handling notice](https://docs.virustotal.com/reference/domain-info).
 - Integration health records authenticated ingest successes and failures, last batch counts and diagnostic details. A source becomes stale after 15 minutes without a successful ingest. Malformed requests rejected before route validation cannot be attributed to a particular integration.
@@ -260,7 +261,15 @@ Backend tests use an isolated SQLite database. The application configuration and
 | 5 · Investigation and response | Timeline, evidence, approvals, manual playbooks and automation history | Complete |
 | 6 · Governance and readiness | Compliance, saved reports, optional SSO and health/readiness controls | Complete |
 
-The six initial product phases are implemented. Wave 1 advanced capabilities add telemetry hunting, incident collaboration mentions and ingestion-time detection rules. Organization-specific integrations, identity-provider setup, production credentials and deployment remain rollout work; they are not included with the local demo data.
+The six initial product phases and three advanced delivery waves are complete for the repository's local, source-neutral demo scope:
+
+| Wave | Scope | Status |
+| --- | --- | --- |
+| 1 | Telemetry hunting, saved queries, incident mentions and ingestion-time detection rules | Complete |
+| 2 | Connector health and ingest diagnostics, global search, operational dashboard summaries | Complete |
+| 3 | Approval-gated response dry-run plans and period-based executive reports with CSV export | Complete |
+
+Wave 3 response plans are audited simulations only. Live containment/remediation requires organization-specific provider adapters, credentials and review. Production identity-provider setup, live source collectors, SMTP delivery, and deployment are rollout configuration. Sigma/YARA parsing and mention notifications are not implemented; current detection rules use the documented simple condition model and mentions are stored on incident notes.
 
 ## Project documentation
 

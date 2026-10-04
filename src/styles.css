@@ -95,4 +95,15 @@
 .consent-check{display:flex;align-items:center;gap:8px;max-width:230px;color:#e6d6b6;font-size:10px;line-height:1.5}
 .consent-check input{accent-color:#328cff}
 .integration-diagnostic{margin-bottom:14px}
+.executive-preview{margin:14px 0}
+.report-preview-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-top:12px}
+.report-preview-grid>.panel{min-width:0}
+.report-preview-grid .workflow-list article{display:flex;align-items:center;justify-content:space-between}
+.report-preview-grid .text-muted{font-size:9px;line-height:1.5}
+.report-json{max-height:440px;overflow:auto;padding:14px;background:#08141d;border-radius:6px;color:#a9c7dc;font-size:10px}
+.dry-run-result{margin:10px 0;padding:11px;border:1px solid #315342;background:#0d211c;border-radius:6px}
+.dry-run-result strong{color:#8be0b9;font-size:10px}
+.dry-run-result p{margin:6px 0;color:#bdcabe;font-size:10px}
+.dry-run-result small{color:#7f9687;font-size:9px}
 @media(max-width:850px){.intel-consent{align-items:flex-start;flex-direction:column;gap:12px}.consent-check{max-width:100%}}
+@media(max-width:850px){.report-preview-grid{grid-template-columns:1fr}}
