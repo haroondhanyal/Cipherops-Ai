@@ -23,6 +23,8 @@ cd backend
 python -m app.seed_demo
 ```
 
+The demo seed creates four fictional accounts per built-in role (including Security Administrator) using the one password entered at the prompt. Re-running it adds missing demo accounts and leaves existing account passwords unchanged.
+
 For a single user, use `python -m app.cli --email analyst@example.com --name "SOC Analyst" --role "SOC Analyst"`; it prompts for a password.
 
 Interactive API docs are available at `http://localhost:8000/docs`. Admin endpoints for user lifecycle, role permissions, integration management, and audit history require `admin:manage`. Users can enroll in TOTP MFA from **Settings → Security settings**; login requires the six digit code after MFA is enabled.

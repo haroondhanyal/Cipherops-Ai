@@ -12,10 +12,25 @@ from .security import hash_password
 
 DEMO_USERS = [
     ("raja.jamal@northstar.example", "Raja Haroon Jamal", "SOC Analyst"),
+    ("soc.analyst.02@northstar.example", "Morgan Brooks", "SOC Analyst"),
+    ("soc.analyst.03@northstar.example", "Lina Park", "SOC Analyst"),
+    ("soc.analyst.04@northstar.example", "Omar Farooq", "SOC Analyst"),
     ("admin@northstar.example", "Northstar Security Admin", "Security Administrator"),
+    ("security.admin.02@northstar.example", "Nadia Rahman", "Security Administrator"),
+    ("security.admin.03@northstar.example", "Ethan Cole", "Security Administrator"),
+    ("security.admin.04@northstar.example", "Maya Chen", "Security Administrator"),
     ("ciso@northstar.example", "Northstar CISO", "CISO"),
+    ("ciso.02@northstar.example", "Elena Torres", "CISO"),
+    ("ciso.03@northstar.example", "David Kim", "CISO"),
+    ("ciso.04@northstar.example", "Aisha Malik", "CISO"),
     ("amina.khan@northstar.example", "Amina Khan", "Cloud Security Engineer"),
+    ("cloud.engineer.02@northstar.example", "Noah Patel", "Cloud Security Engineer"),
+    ("cloud.engineer.03@northstar.example", "Zara Ahmed", "Cloud Security Engineer"),
+    ("cloud.engineer.04@northstar.example", "Leo Martin", "Cloud Security Engineer"),
     ("sara.ali@northstar.example", "Sara Ali", "Compliance Officer"),
+    ("compliance.02@northstar.example", "Grace Wilson", "Compliance Officer"),
+    ("compliance.03@northstar.example", "Bilal Hussain", "Compliance Officer"),
+    ("compliance.04@northstar.example", "Priya Shah", "Compliance Officer"),
 ]
 DEMO_ASSETS = [
     (
@@ -413,11 +428,11 @@ def main():
                 )
         db.commit()
     print(
-        f"Seeded {len(DEMO_USERS)} fictional user accounts and "
+        f"Processed {len(DEMO_USERS)} fictional demo accounts (four per built-in role) and "
         f"{len(INCIDENTS)} fictional incidents, {len(DEMO_ALERTS)} alerts, "
         f"{len(DEMO_ASSETS)} assets and {len(DEMO_ALERTS)} telemetry events."
     )
-    print("All demo accounts use the password you entered.")
+    print("New demo accounts use the password you entered; existing accounts keep their password.")
     for email, _, role in DEMO_USERS:
         print(f"  {email} — {role}")
 

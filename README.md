@@ -129,7 +129,7 @@ source .venv/bin/activate
 python -m app.cli --email analyst@example.com --name "SOC Analyst" --role "SOC Analyst"
 ```
 
-The command prompts for the password. To load the fictional local demo workspace instead, run `python -m app.seed_demo`; it prompts once for a password shared by the seeded accounts. There are no built-in credentials.
+The command prompts for the password. To load the fictional local demo workspace instead, run `python -m app.seed_demo`; it prompts once for a password shared by new seeded accounts and creates four demo users for each built-in role. Existing demo users keep their current passwords. There are no built-in credentials.
 
 ### 4. Start the frontend
 
