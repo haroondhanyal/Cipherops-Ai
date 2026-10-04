@@ -156,7 +156,7 @@ Open the Vite URL, normally `http://localhost:5173`, and sign in with the accoun
 | `VITE_API_URL` | root `.env` | Frontend API base URL; defaults to local API |
 | `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI` | `backend/.env` | Optional company OIDC configuration; all four values are needed to enable SSO |
 | `FRONTEND_URL` | `backend/.env` | Frontend return URL after successful SSO |
-| `ALLOW_PUBLIC_SIGNUP` | `backend/.env` | Enables registration; new accounts always receive the least-privileged `SOC Analyst` role |
+| `ALLOW_PUBLIC_SIGNUP` | `backend/.env` | Enables registration; accounts start with `SOC Analyst` permissions while requested roles await administrator approval |
 | `PASSWORD_RESET_DEV_MODE` | `backend/.env` | Returns a reset link only when the configured frontend is loopback; local development only |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_STARTTLS` | `backend/.env` | Optional mail delivery for password recovery |
 
@@ -187,7 +187,7 @@ Use the top-bar search or `⌘K` / `Ctrl+K` to find incidents, alerts, assets an
 
 ### Create and manage an account
 
-When public signup is enabled, the login screen offers photo upload, first/last name, international phone country code, country and city. Users can edit these details under **Settings**. New accounts receive only `SOC Analyst`; administrators assign elevated roles. Password recovery sends a short-lived, single-use link through configured SMTP. Local development may enable `PASSWORD_RESET_DEV_MODE` to show a loopback-only reset link without mail.
+When public signup is enabled, the login screen offers photo upload, first/last name, international phone country code, country, city and five icon-based domain-role requests. Users can edit profile details under **Settings**; administrators approve role requests from **Users**. Password recovery sends a short-lived, single-use link through configured SMTP. Local development may enable `PASSWORD_RESET_DEV_MODE` to show a loopback-only reset link without mail.
 
 ## API overview
 
@@ -205,12 +205,12 @@ All operational endpoints are versioned under `/api/v1`. Use the interactive doc
 | Governance | `/compliance`, `/reports` | Control/evidence tracking and saved report snapshots/CSV |
 | Administration | `/admin` | User/role management and audit history |
 
-Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0005_account_profile_recovery.py`.
+Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0006_signup_role_requests.py`.
 
 ## Security and operational boundaries
 
 - JWT authentication, RBAC, audit logging, optional TOTP MFA and optional OIDC authorization-code flow with PKCE are implemented.
-- Public signup is opt-in and grants only `SOC Analyst`; elevated roles remain administrator-managed. Password recovery stores only a token hash, uses single-use expiring links and invalidates previous sessions after a reset.
+- Public signup is opt-in. Signup records the selected role request while granting only `SOC Analyst`; administrators review requests and assign access from Users. Password recovery stores only a token hash, uses single-use expiring links and invalidates previous sessions after a reset.
 - OIDC users must already exist in CipherOps. The provider needs a matching callback URL and verified identity claims; users with CipherOps MFA enabled must receive the expected MFA claim.
 - Integration ingestion keys are generated for each source and shown once. Revoke compromised or retired keys from the Integrations screen.
 - Incident response approvals prevent an operator from approving their own request. Approval records and playbook checklists do not themselves execute containment.

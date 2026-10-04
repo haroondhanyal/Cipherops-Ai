@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..database import get_db
 from ..dependencies import require_permission
 from ..models import AuditLog, Role, User
-from ..schemas import UserCreate, UserStatusUpdate
+from ..schemas import RoleAssignment, UserCreate, UserStatusUpdate
 from ..security import hash_password
 
 router = APIRouter(prefix="/api/v1/admin", tags=["administration"])
@@ -36,6 +36,7 @@ def list_users(db: Session = Depends(get_db)):
             "full_name": u.full_name,
             "is_active": u.is_active,
             "roles": [r.name for r in u.roles],
+            "requested_role": u.requested_role,
         }
         for u in users
     ]
@@ -90,6 +91,40 @@ def update_user_status(
     db.add(AuditLog(actor_id=actor.id, action="admin.user_status_changed", resource=target.email))
     db.commit()
     return {"id": target.id, "email": target.email, "is_active": target.is_active}
+
+
+@router.patch("/users/{user_id}/role")
+def assign_user_role(
+    user_id: int,
+    payload: RoleAssignment,
+    actor: User = Depends(require_permission("admin:manage")),
+    db: Session = Depends(get_db),
+):
+    target = db.scalar(select(User).options(selectinload(User.roles)).where(User.id == user_id))
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    role = db.scalar(
+        select(Role).options(selectinload(Role.permissions)).where(Role.name == payload.role)
+    )
+    if not role:
+        raise HTTPException(status_code=422, detail="Unknown role")
+    if target.id == actor.id and not any(
+        permission.key == "admin:manage" for permission in role.permissions
+    ):
+        raise HTTPException(
+            status_code=422, detail="You cannot remove your own administrator access"
+        )
+    target.roles = [role]
+    target.requested_role = role.name
+    db.add(
+        AuditLog(
+            actor_id=actor.id,
+            action="admin.user_role_assigned",
+            resource=f"{target.email}:{role.name}",
+        )
+    )
+    db.commit()
+    return {"id": target.id, "email": target.email, "roles": [role.name]}
 
 
 @router.get("/audit-logs", dependencies=[Depends(require_permission("admin:manage"))])

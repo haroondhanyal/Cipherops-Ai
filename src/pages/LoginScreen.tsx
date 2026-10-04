@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
-import { ChevronRight, Eye, EyeOff, ImagePlus, ShieldCheck, X } from 'lucide-react';
+import { BadgeCheck, BriefcaseBusiness, ChevronRight, Cloud, Eye, EyeOff, ImagePlus, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import { API, imageToAvatar, type SessionUser } from '../shared';
 import { CountryPicker } from '../components/CountryPicker';
 import type { Country } from '../data/countries';
@@ -7,6 +7,13 @@ import { UserAvatar } from '../components/UserAvatar';
 
 type Screen = 'signin' | 'signup' | 'forgot' | 'reset';
 type AuthResponse = { access_token: string; user: SessionUser };
+const signupRoles = [
+  { name: 'SOC Analyst', description: 'Monitor alerts and investigate incidents', icon: ShieldAlert },
+  { name: 'Cloud Security Engineer', description: 'Review cloud assets and exposures', icon: Cloud },
+  { name: 'Compliance Officer', description: 'Manage controls and evidence', icon: BadgeCheck },
+  { name: 'CISO', description: 'Review security posture and reports', icon: BriefcaseBusiness },
+  { name: 'Security Administrator', description: 'Manage workspace access and policy', icon: ShieldCheck },
+] as const;
 
 async function responseError(response: Response, fallback: string) {
   const data = await response.json().catch(() => ({}));
@@ -48,6 +55,7 @@ export function LoginScreen({ onLogin }: { onLogin: (token: string, user: Sessio
   const [country, setCountry] = useState('Pakistan');
   const [city, setCity] = useState('');
   const [avatarData, setAvatarData] = useState<string | null>(null);
+  const [requestedRole, setRequestedRole] = useState<string>('SOC Analyst');
 
   useEffect(() => {
     sessionStorage.removeItem('cipherops.sso.error');
@@ -99,7 +107,7 @@ export function LoginScreen({ onLogin }: { onLogin: (token: string, user: Sessio
     if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
     setBusy(true);
     try {
-      const response = await fetch(`${API}/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, first_name: firstName, last_name: lastName, phone_country: phoneCountry, phone_dial_code: phoneDialCode, mobile_number: mobileNumber, country_code: countryCode, country, city, password, confirm_password: confirmPassword, avatar_data: avatarData }) });
+      const response = await fetch(`${API}/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, first_name: firstName, last_name: lastName, phone_country: phoneCountry, phone_dial_code: phoneDialCode, mobile_number: mobileNumber, country_code: countryCode, country, city, password, confirm_password: confirmPassword, avatar_data: avatarData, requested_role: requestedRole }) });
       if (!response.ok) throw new Error(await responseError(response, 'Account creation failed.'));
       persistSession(await response.json());
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not reach CipherOps API.'); }
@@ -166,7 +174,7 @@ export function LoginScreen({ onLogin }: { onLogin: (token: string, user: Sessio
       <div className="auth-grid two"><CountryPicker label="Country" value={countryCode} onChange={selected => { setCountryCode(selected.code); setCountry(selected.name); }}/><label className="auth-field"><span>City</span><input autoComplete="address-level2" value={city} onChange={event => setCity(event.target.value)} maxLength={120} required/></label></div>
       <PasswordInput label="Password (12 characters minimum)" autoComplete="new-password" value={password} onChange={setPassword} minLength={12}/>
       <PasswordInput label="Confirm password" autoComplete="new-password" value={confirmPassword} onChange={setConfirmPassword} minLength={12}/>
-      <div className="assigned-role"><ShieldCheck size={15}/><span>Workspace role</span><b>SOC Analyst</b><small>Workspace administrators assign elevated roles.</small></div>
+      <fieldset className="signup-role-picker"><legend>Choose your domain role</legend><div className="signup-role-grid">{signupRoles.map(({ name, description, icon: Icon }) => <button type="button" key={name} className={`signup-role-option ${requestedRole === name ? 'selected' : ''}`} onClick={() => setRequestedRole(name)} aria-pressed={requestedRole === name}><Icon size={17}/><strong>{name}</strong><small>{description}</small></button>)}</div><p>Role access is approved by a workspace administrator. Until approved, new accounts start with SOC Analyst permissions.</p></fieldset>
       {error && <div className="login-error">{error}</div>}
       <button className="button primary login-submit" disabled={busy}>{busy ? 'Creating account…' : 'Create analyst account'} <ChevronRight size={15}/></button>
       <div className="auth-switch">Already have an account? <button type="button" onClick={() => { setScreen('signin'); setError(''); setMessage(''); }}>Sign in</button></div>

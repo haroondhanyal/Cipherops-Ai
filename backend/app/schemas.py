@@ -26,6 +26,13 @@ class RegistrationRequest(BaseModel):
         max_length=400_000,
         pattern="^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$",
     )
+    requested_role: str = Field(
+        default="SOC Analyst",
+        pattern=(
+            "^(SOC Analyst|Cloud Security Engineer|Compliance Officer|"
+            "CISO|Security Administrator)$"
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_password_confirmation(self):
@@ -79,6 +86,10 @@ class UserCreate(BaseModel):
 
 class UserStatusUpdate(BaseModel):
     is_active: bool
+
+
+class RoleAssignment(BaseModel):
+    role: str = Field(min_length=2, max_length=80)
 
 
 class IncidentCreate(BaseModel):

@@ -276,6 +276,7 @@ def register(payload: RegistrationRequest, db: Session = Depends(get_db)):
         session_version=0,
         city=payload.city.strip(),
         avatar_data=payload.avatar_data,
+        requested_role=payload.requested_role,
         password_hash=hash_password(payload.password),
         roles=[role],
     )

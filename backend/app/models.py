@@ -44,6 +44,7 @@ class User(Base):
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     city: Mapped[str | None] = mapped_column(String(120), nullable=True)
     avatar_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requested_role: Mapped[str | None] = mapped_column(String(80), nullable=True)
     session_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

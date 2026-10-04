@@ -29,7 +29,7 @@ Interactive API docs are available at `http://localhost:8000/docs`. Admin endpoi
 
 ## Signup, profile and password recovery
 
-Set `ALLOW_PUBLIC_SIGNUP=true` to show self-registration. New accounts always get the `SOC Analyst` role; administrators assign elevated roles. Signup captures a profile photo, first/last name, international calling code, mobile number, country and city. Users can edit these fields from **Settings**.
+Set `ALLOW_PUBLIC_SIGNUP=true` to show self-registration. Signup includes all five built-in domain roles with icons. The selected role is stored as a request; new accounts receive `SOC Analyst` permissions until a Security Administrator assigns their approved role in **Users**. Signup captures a profile photo, first/last name, international calling code, mobile number, country and city. Users can edit these fields from **Settings**.
 
 Password reset tokens are random, stored only as hashes, expire after 20 minutes and can be used once. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` and `SMTP_STARTTLS` to deliver recovery links. For local testing without an email server, set `PASSWORD_RESET_DEV_MODE=true` and use a loopback `FRONTEND_URL`; only then will the API return a development reset URL. Keep that flag disabled outside local development. Successful recovery invalidates existing sessions.
 

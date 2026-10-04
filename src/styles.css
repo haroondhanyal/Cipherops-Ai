@@ -63,11 +63,24 @@
 .profile-role svg{grid-row:span 2}
 .profile-role b{justify-self:start}
 .profile-role small{grid-column:2/-1}
+.signup-role-picker{min-width:0;margin:4px 0 0;padding:10px;border:1px solid #203747;border-radius:7px}
+.signup-role-picker legend{padding:0 5px;color:#c2d6e3;font-size:10px;font-weight:700}
+.signup-role-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.signup-role-option{display:grid;grid-template-columns:20px 1fr;gap:4px 7px;text-align:left;padding:9px;border:1px solid #223847;border-radius:6px;background:#0b1721;color:#96aebe;cursor:pointer}
+.signup-role-option svg{grid-row:span 2;color:#7799ac}
+.signup-role-option strong{font-size:9px;color:#c5d8e5}
+.signup-role-option small{grid-column:2;color:#71899b;font-size:8px;line-height:1.4}
+.signup-role-option.selected{border-color:#45a4cc;background:#102532;box-shadow:inset 0 0 0 1px #45a4cc}
+.signup-role-option.selected svg{color:#72d7f2}
+.signup-role-picker>p{margin:9px 0 0;color:#8095a5;font-size:9px;line-height:1.5}
+.role-request{display:block;margin:4px 0;color:#b4d4e8}
+.admin-table td select{margin-top:6px;max-width:210px}
 .top-user .avatar{overflow:hidden}
 @media(max-width:560px){
  .login-screen{padding:14px 10px 58px}
  .auth-card{width:100%;max-height:calc(100vh - 76px);padding:22px 18px}
  .auth-grid.two{grid-template-columns:1fr}
  .auth-grid.phone-grid{grid-template-columns:minmax(126px,.82fr) minmax(0,1.18fr);gap:8px}
+ .signup-role-grid{grid-template-columns:1fr}
  .auth-field input,.country-picker select{font-size:10px;padding-left:8px}
 }
