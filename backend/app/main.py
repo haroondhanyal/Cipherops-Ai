@@ -9,7 +9,17 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .config import settings
 from .database import SessionLocal
 from .models import ComplianceControl, Permission, ResponsePlaybook, Role
-from .routers import admin, auth, domains, governance, incidents, platform, search, workflows
+from .routers import (
+    admin,
+    auth,
+    domains,
+    governance,
+    hunting,
+    incidents,
+    platform,
+    search,
+    workflows,
+)
 
 
 class OperationalHeadersMiddleware(BaseHTTPMiddleware):
@@ -42,6 +52,8 @@ async def lifespan(_: FastAPI):
             ("reports:read", "View saved security reports"),
             ("reports:manage", "Generate and save security reports"),
             ("admin:manage", "Manage users and roles"),
+            ("detection:read", "View and simulate detection rules"),
+            ("detection:manage", "Create and manage detection rules"),
         ]:
             permission = db.scalar(select(Permission).where(Permission.key == key))
             if permission is None:
@@ -54,6 +66,8 @@ async def lifespan(_: FastAPI):
                 "incidents:manage",
                 "alerts:read",
                 "alerts:manage",
+                "detection:read",
+                "detection:manage",
                 "assets:read",
                 "findings:read",
                 "findings:manage",
@@ -64,6 +78,8 @@ async def lifespan(_: FastAPI):
                 "incidents:manage",
                 "alerts:read",
                 "alerts:manage",
+                "detection:read",
+                "detection:manage",
                 "assets:read",
                 "findings:read",
                 "findings:manage",
@@ -78,6 +94,7 @@ async def lifespan(_: FastAPI):
                 "dashboard:read",
                 "incidents:read",
                 "alerts:read",
+                "detection:read",
                 "assets:read",
                 "findings:read",
                 "response:approve",
@@ -88,6 +105,7 @@ async def lifespan(_: FastAPI):
                 "dashboard:read",
                 "incidents:read",
                 "alerts:read",
+                "detection:read",
                 "assets:read",
                 "findings:read",
                 "findings:manage",
@@ -224,3 +242,4 @@ app.include_router(domains.router)
 app.include_router(workflows.router)
 app.include_router(governance.router)
 app.include_router(search.router)
+app.include_router(hunting.router)

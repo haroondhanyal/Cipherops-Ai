@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Badge } from '../components/Badge';
 import { API, api, type Page, type SessionUser } from '../shared';
+import { ThreatHuntingPage } from './ThreatHuntingPage';
+import { DetectionRulesPage } from './DetectionRulesPage';
 
 type Finding = { id:number; domain:string; external_id:string; title:string; description:string; severity:string; status:string; source:string; asset_key:string|null; owner:string; risk_score:number; attributes:Record<string,unknown> };
 type Control = {id:number;framework:string;control_key:string;title:string;description:string;status:string;owner:string;evidence_count:number};
@@ -9,6 +11,8 @@ type Report = {id:number;report_type:string;title:string;created_at:string;row_c
 const domainFor:Partial<Record<Page,string>>={'Cloud Security':'cloud','Identity Security':'identity','Vulnerabilities':'vulnerability','AI Agent Security':'agent','Threat Intelligence':'threat'};
 
 export function ModulePage({page,token,user,initialQuery=''}:{page:Page;token:string;user:SessionUser;initialQuery?:string}) {
+  if (page==='Threat Hunting') return <ThreatHuntingPage token={token} canManage={user.permissions.includes('alerts:manage')}/>;
+  if (page==='Detection Rules') return user.permissions.includes('detection:read')?<DetectionRulesPage token={token} canManage={user.permissions.includes('detection:manage')}/>:<div className="admin-error">Your role cannot view detection rules.</div>;
   if (page==='Compliance') return <CompliancePage token={token} canManage={user.permissions.includes('compliance:manage')}/>;
   if (page==='Reports') return <ReportsPage token={token} canManage={user.permissions.includes('reports:manage')}/>;
   if (domainFor[page]) return <FindingsPage page={page} domain={domainFor[page]!} token={token} canManage={user.permissions.includes('findings:manage')} initialQuery={initialQuery}/>;

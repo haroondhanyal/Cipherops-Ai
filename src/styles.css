@@ -84,3 +84,7 @@
  .signup-role-grid{grid-template-columns:1fr}
  .auth-field input,.country-picker select{font-size:10px;padding-left:8px}
 }
+.inline-note-form textarea{flex:1;min-height:72px;resize:vertical;border:1px solid #283e4d;background:#091720;color:#dce7f0;border-radius:6px;padding:9px 10px;font:inherit;font-size:10px;line-height:1.5}
+.inline-note-form textarea::placeholder{color:#718697}
+.filters>input{height:34px;min-width:140px;flex:1;border:1px solid #283e4d;background:#091720;color:#dce7f0;border-radius:6px;padding:0 10px;font-size:10px}
+.workflow-list article code{color:#95bdd8;overflow-wrap:anywhere}

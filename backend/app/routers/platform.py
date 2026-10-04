@@ -14,6 +14,7 @@ from ..models import (
     Alert,
     Asset,
     AuditLog,
+    DetectionRule,
     Incident,
     IncidentEvent,
     Integration,
@@ -242,6 +243,7 @@ def ingest_telemetry(
     accepted = duplicates = alerts_created = assets_upserted = 0
     source = integration.name
     severity_rank = {"Informational": 0, "Low": 1, "Medium": 2, "High": 3, "Critical": 4}
+    enabled_rules = db.scalars(select(DetectionRule).where(DetectionRule.enabled.is_(True))).all()
     for item in batch.events:
         event = db.scalar(
             select(TelemetryEvent).where(
@@ -270,6 +272,30 @@ def ingest_telemetry(
             )
             db.add(event)
             accepted += 1
+        rule_matches = [
+            rule
+            for rule in enabled_rules
+            if (not rule.event_type or rule.event_type.casefold() == item.event_type.casefold())
+            and (
+                not rule.summary_contains
+                or rule.summary_contains.casefold() in item.summary.casefold()
+            )
+            and severity_rank[item.severity] >= severity_rank[rule.minimum_severity]
+        ]
+        if rule_matches:
+            event.payload = {
+                **(event.payload or {}),
+                "detection_rule_matches": [
+                    {"id": rule.id, "name": rule.name} for rule in rule_matches
+                ],
+            }
+        rule_severity = max(
+            (rule.minimum_severity for rule in rule_matches),
+            key=lambda value: severity_rank[value],
+            default="Informational",
+        )
+        if rule_matches and rule_severity == "Informational":
+            rule_severity = "Low"
         if item.asset:
             asset = db.get(Asset, item.asset.asset_key)
             values = item.asset.model_dump(exclude={"asset_key"})
@@ -328,13 +354,15 @@ def ingest_telemetry(
             if observed_values
             else []
         )
-        effective_severity = item.severity
+        effective_severity = max(
+            [item.severity, rule_severity], key=lambda value: severity_rank[value]
+        )
         if matches:
             effective_severity = max(
-                [item.severity, *(row.severity for row in matches)],
+                [effective_severity, *(row.severity for row in matches)],
                 key=lambda value: severity_rank[value],
             )
-            payload = dict(item.attributes)
+            payload = dict(event.payload or item.attributes)
             payload["threat_intel_matches"] = [
                 {
                     "indicator": row.attributes.get("value") or row.attributes.get("indicator"),
@@ -346,12 +374,15 @@ def ingest_telemetry(
             ]
             event.payload = payload
         alert_summary = item.summary
+        if rule_matches:
+            rule_names = ", ".join(rule.name for rule in rule_matches[:5])
+            alert_summary = f"{item.summary} · Detection rule: {rule_names}"
         if matches:
             match_names = ", ".join(
                 str(row.attributes.get("value") or row.attributes.get("indicator"))
                 for row in matches[:5]
             )
-            alert_summary = f"{item.summary} · Threat intel match: {match_names}"
+            alert_summary = f"{alert_summary} · Threat intel match: {match_names}"
         if effective_severity != "Informational":
             fingerprint = hashlib.sha256(f"{source}|{item.external_id}".encode()).hexdigest()
             alert = db.scalar(select(Alert).where(Alert.fingerprint == fingerprint))

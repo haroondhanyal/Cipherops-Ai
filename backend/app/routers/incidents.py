@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,9 +29,7 @@ def dashboard_summary(db: Session = Depends(get_db)):
 
     total = db.scalar(select(func.count()).select_from(Incident)) or 0
     open_incidents = (
-        db.scalar(
-            select(func.count()).select_from(Incident).where(Incident.status != "Closed")
-        )
+        db.scalar(select(func.count()).select_from(Incident).where(Incident.status != "Closed"))
         or 0
     )
     critical = (
@@ -203,6 +202,7 @@ def list_incident_events(
             "event_type": event.event_type,
             "title": event.title,
             "detail": event.detail,
+            "mentions": event.mentions or [],
             "actor": users.get(event.actor_id, "System"),
             "created_at": event.created_at,
         }
@@ -220,12 +220,26 @@ def create_incident_event(
     incident = db.scalar(select(Incident).where(Incident.incident_key == incident_key))
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
+    mentioned_emails = {
+        email.casefold()
+        for email in re.findall(r"(?<![\w.+-])@([\w.+-]+@[\w.-]+\.[A-Za-z]{2,})", payload.detail)
+    }
+    valid_mentions = (
+        db.scalars(
+            select(User.email).where(
+                User.is_active.is_(True), func.lower(User.email).in_(mentioned_emails)
+            )
+        ).all()
+        if mentioned_emails
+        else []
+    )
     event = IncidentEvent(
         incident_id=incident.id,
         actor_id=actor.id,
         event_type=payload.event_type,
         title=payload.title.strip(),
         detail=payload.detail.strip(),
+        mentions=sorted(valid_mentions),
     )
     db.add(event)
     db.add(
@@ -238,6 +252,7 @@ def create_incident_event(
         "event_type": event.event_type,
         "title": event.title,
         "detail": event.detail,
+        "mentions": event.mentions,
         "actor": actor.email,
         "created_at": event.created_at,
     }

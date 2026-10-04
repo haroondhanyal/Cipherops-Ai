@@ -29,8 +29,7 @@ class RegistrationRequest(BaseModel):
     requested_role: str = Field(
         default="SOC Analyst",
         pattern=(
-            "^(SOC Analyst|Cloud Security Engineer|Compliance Officer|"
-            "CISO|Security Administrator)$"
+            "^(SOC Analyst|Cloud Security Engineer|Compliance Officer|CISO|Security Administrator)$"
         ),
     )
 
@@ -113,6 +112,32 @@ class IncidentEventCreate(BaseModel):
     event_type: str = Field(default="note", pattern="^(note|action|approval|evidence)$")
     title: str = Field(min_length=2, max_length=160)
     detail: str = Field(default="", max_length=4000)
+
+
+class SavedHuntQueryCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    query: str = Field(min_length=2, max_length=500)
+
+
+class DetectionRuleCreate(BaseModel):
+    name: str = Field(min_length=3, max_length=160)
+    description: str = Field(default="", max_length=1000)
+    event_type: str | None = Field(default=None, max_length=100)
+    minimum_severity: str = Field(
+        default="Medium", pattern="^(Critical|High|Medium|Low|Informational)$"
+    )
+    summary_contains: str | None = Field(default=None, max_length=240)
+    enabled: bool = True
+
+
+class DetectionRuleUpdate(BaseModel):
+    description: str | None = Field(default=None, max_length=1000)
+    event_type: str | None = Field(default=None, max_length=100)
+    minimum_severity: str | None = Field(
+        default=None, pattern="^(Critical|High|Medium|Low|Informational)$"
+    )
+    summary_contains: str | None = Field(default=None, max_length=240)
+    enabled: bool | None = None
 
 
 class AlertUpdate(BaseModel):
