@@ -129,7 +129,9 @@ source .venv/bin/activate
 python -m app.cli --email analyst@example.com --name "SOC Analyst" --role "SOC Analyst"
 ```
 
-The command prompts for the password. To load the fictional local demo workspace instead, run `python -m app.seed_demo`; it prompts once for a password shared by new seeded accounts and creates four demo users for each built-in role. Existing demo users keep their current passwords. There are no built-in credentials.
+The command prompts for the password. To load the fictional local demo workspace instead, run `python -m app.seed_demo`; it prompts once for a password shared by all 20 seeded users and populates each operational and reporting module with reviewable sample records. It resets passwords on the seeded demo users only; regular accounts are untouched. The sample data and credentials are local-development fixtures.
+
+The demo dataset contains **20 users, incidents, alerts, assets, telemetry events and compliance controls; 10 findings in each of five security domains; and 10 each of evidence records, response requests, playbook runs, saved reports and integrations**. Automation playbooks, integration samples and all evidence links are fictional; integrations are inactive.
 
 ### 4. Start the frontend
 
@@ -248,7 +250,7 @@ Backend tests use an isolated SQLite database. The application configuration and
 | 5 · Investigation and response | Timeline, evidence, approvals, manual playbooks and automation history | Complete |
 | 6 · Governance and readiness | Compliance, saved reports, optional SSO and health/readiness controls | Complete |
 
-The six product phases are implemented. Organization-specific integration, identity-provider and production deployment configuration remain rollout work, not included credentials or external service connections.
+The six product phases are implemented. Organization-specific integrations, identity-provider setup, production credentials and deployment remain rollout work; they are not included with the local demo data.
 
 ## Project documentation
 
@@ -271,3 +273,25 @@ These fictional `northstar.example` accounts are for the seeded local developmen
 - **Compliance Officer:** `sara.ali@northstar.example`, `compliance.02@northstar.example`, `compliance.03@northstar.example`, `compliance.04@northstar.example`
 
 The seed command sets this password on these 20 demo accounts only; it does not change other users.
+
+## Screenshots
+
+These screenshots show the application populated with its fictional local demo data:
+
+**Operations**
+
+| Dashboard | Incidents | Alerts | Assets |
+| --- | --- | --- | --- |
+| <img src="./docs/screenshots/dashboard.jpg" alt="CipherOps dashboard" width="350"> | <img src="./docs/screenshots/incidents.jpg" alt="Incidents" width="350"> | <img src="./docs/screenshots/alerts.jpg" alt="Alerts" width="350"> | <img src="./docs/screenshots/assets.jpg" alt="Assets" width="350"> |
+
+**Security domains**
+
+| Cloud | Identity | Vulnerabilities | AI agent security | Threat intelligence |
+| --- | --- | --- | --- | --- |
+| <img src="./docs/screenshots/cloud-security.jpg" alt="Cloud findings" width="280"> | <img src="./docs/screenshots/identity-security.jpg" alt="Identity findings" width="280"> | <img src="./docs/screenshots/vulnerabilities.jpg" alt="Vulnerability findings" width="280"> | <img src="./docs/screenshots/ai-agent-security.jpg" alt="AI agent findings" width="280"> | <img src="./docs/screenshots/threat-intelligence.jpg" alt="Threat indicators" width="280"> |
+
+**Governance and administration**
+
+| Compliance | Reports | Automation | Users and roles | Integrations | Audit log |
+| --- | --- | --- | --- | --- | --- |
+| <img src="./docs/screenshots/compliance.jpg" alt="Compliance controls" width="220"> | <img src="./docs/screenshots/reports.jpg" alt="Saved reports" width="220"> | <img src="./docs/screenshots/automation.jpg" alt="Automation review" width="220"> | <img src="./docs/screenshots/admin.jpg" alt="User administration" width="220"> | <img src="./docs/screenshots/integrations.jpg" alt="Integrations" width="220"> | <img src="./docs/screenshots/audit-logs.jpg" alt="Audit log" width="220"> |

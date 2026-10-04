@@ -7,7 +7,25 @@ from getpass import getpass
 from sqlalchemy import select
 
 from .database import SessionLocal
-from .models import Alert, Asset, Incident, Role, TelemetryEvent, User
+from .models import (
+    Alert,
+    Asset,
+    AuditLog,
+    ComplianceControl,
+    ControlEvidence,
+    Incident,
+    IncidentEvent,
+    IncidentEvidence,
+    Integration,
+    PlaybookRun,
+    ReportSnapshot,
+    ResponseAction,
+    ResponsePlaybook,
+    Role,
+    SecurityFinding,
+    TelemetryEvent,
+    User,
+)
 from .security import hash_password
 
 DEMO_USERS = [
@@ -334,6 +352,43 @@ INCIDENTS = [
     ),
 ]
 
+ALERT_TITLES = [
+    "Unusual workload identity token exchange",
+    "Endpoint persistence mechanism detected",
+    "Sensitive object access burst observed",
+    "New privileged application credential created",
+    "Outbound traffic to newly registered domain",
+    "Unpatched container image deployed to production",
+    "Repeated password spray attempts detected",
+    "Database snapshot shared outside the organization",
+    "Cloud firewall opened to the public internet",
+    "Suspicious scheduled task on finance endpoint",
+    "Service principal granted directory-wide access",
+    "Large archive uploaded to unsanctioned storage",
+    "Critical package vulnerability in build pipeline",
+    "Unusual administrator session from unmanaged device",
+    "Agent requested access to restricted data source",
+]
+
+FINDING_DOMAINS = {
+    "cloud": ("Cloud posture", "Cloud"),
+    "identity": ("Identity monitor", "Identity"),
+    "vulnerability": ("Vulnerability scanner", "Vulnerability"),
+    "agent": ("AI policy monitor", "AI agent"),
+    "threat": ("Threat intelligence feed", "Indicator"),
+}
+
+EXTRA_CONTROLS = [
+    ("ISO 27001", "A.8.16", "Monitoring activities"),
+    ("ISO 27001", "A.8.23", "Web filtering"),
+    ("SOC 2", "CC5.2", "Risk identification"),
+    ("SOC 2", "CC8.1", "Change management"),
+    ("NIST CSF", "ID.AM-02", "Software and service inventory"),
+    ("NIST CSF", "PR.DS-01", "Data at rest protection"),
+    ("CIS v8", "4.1", "Secure configuration process"),
+    ("CIS v8", "13.1", "Central security event alerting"),
+]
+
 
 def main():
     password = getpass("Password for seeded demo accounts (12+ characters): ")
@@ -359,6 +414,16 @@ def main():
             else:
                 user.password_hash = password_digest
                 user.roles = [roles[role]]
+        analysts = db.scalars(
+            select(User).where(
+                User.email.in_(
+                    ["raja.jamal@northstar.example", "admin@northstar.example"]
+                )
+            )
+        ).all()
+        actor_by_email = {user.email: user for user in analysts}
+        analyst = actor_by_email["raja.jamal@northstar.example"]
+        admin = actor_by_email["admin@northstar.example"]
         now = datetime.now(timezone.utc)
         for index, (key, title, severity, score, status, source, asset_count, owner) in enumerate(
             INCIDENTS
@@ -377,7 +442,22 @@ def main():
                         created_at=now - timedelta(minutes=index * 7),
                     )
                 )
-        for asset_key, name, kind, env, provider, region, owner, criticality, risk in DEMO_ASSETS:
+        extra_assets = [
+            (
+                f"demo:{('aws', 'azure', 'gcp')[index % 3]}:workload-{index:02d}",
+                f"workload-{index:02d}",
+                ("Compute instance", "Database", "Container service")[index % 3],
+                ("Production", "Corporate", "Development")[index % 3],
+                ("AWS", "Azure", "GCP")[index % 3],
+                ("us-east-1", "eastus", "europe-west1")[index % 3],
+                ("Platform team", "Identity team", "Data team")[index % 3],
+                ("Critical", "High", "Medium", "Low")[index % 4],
+                (95 - index * 3) % 100,
+            )
+            for index in range(6, 21)
+        ]
+        all_assets = DEMO_ASSETS + extra_assets
+        for asset_key, name, kind, env, provider, region, owner, criticality, risk in all_assets:
             if not db.get(Asset, asset_key):
                 db.add(
                     Asset(
@@ -394,7 +474,19 @@ def main():
                         attributes={"demo": True},
                     )
                 )
-        for index, (key, title, severity, source, external_id, asset_key) in enumerate(DEMO_ALERTS):
+        extra_alerts = [
+            (
+                f"ALR-DEMO{index:06d}",
+                title,
+                ("Critical", "High", "Medium", "Low")[index % 4],
+                ("CloudTrail", "Entra ID", "Endpoint EDR", "Vulnerability scanner")[index % 4],
+                f"evt-demo-{index:03d}",
+                all_assets[index % len(all_assets)][0],
+            )
+            for index, title in enumerate(ALERT_TITLES, start=6)
+        ]
+        all_alerts = DEMO_ALERTS + extra_alerts
+        for index, (key, title, severity, source, external_id, asset_key) in enumerate(all_alerts):
             fingerprint = hashlib.sha256(f"demo|{external_id}".encode()).hexdigest()
             if not db.scalar(select(Alert.id).where(Alert.alert_key == key)):
                 db.add(
@@ -422,19 +514,370 @@ def main():
                     TelemetryEvent(
                         source=source,
                         external_id=external_id,
-                        event_type="detection",
+                        event_type=(
+                            "detection"
+                            if index < len(DEMO_ALERTS)
+                            else ("identity.signin", "network.connection", "cloud.audit")[
+                                index % 3
+                            ]
+                        ),
                         severity=severity,
                         summary=title,
                         asset_key=asset_key,
                         occurred_at=now - timedelta(minutes=index * 3),
-                        payload={"demo": True},
+                        payload=(
+                            {"demo": True}
+                            if index < len(DEMO_ALERTS)
+                            else {"demo": True, "latitude": 24.86, "longitude": 67.01}
+                        ),
+                    )
+                )
+
+        for index, (framework, control_key, title) in enumerate(EXTRA_CONTROLS, start=13):
+            exists = db.scalar(
+                select(ComplianceControl.id).where(
+                    ComplianceControl.framework == framework,
+                    ComplianceControl.control_key == control_key,
+                )
+            )
+            if exists is None:
+                db.add(
+                    ComplianceControl(
+                        framework=framework,
+                        control_key=control_key,
+                        title=title,
+                        description="Demo control for security assurance and audit review.",
+                        status=("Compliant", "In progress", "Not assessed")[index % 3],
+                        owner=("Security team", "Platform team", "Compliance team")[index % 3],
+                    )
+                )
+
+        db.flush()
+        controls = db.scalars(
+            select(ComplianceControl).order_by(ComplianceControl.framework, ComplianceControl.id)
+        ).all()
+        for index, control in enumerate(controls[:10], start=1):
+            title = f"Demo evidence package {index:02d}"
+            if not db.scalar(
+                select(ControlEvidence.id).where(
+                    ControlEvidence.control_id == control.id, ControlEvidence.title == title
+                )
+            ):
+                db.add(
+                    ControlEvidence(
+                        control_id=control.id,
+                        added_by=admin.id,
+                        title=title,
+                        source_uri=f"https://evidence.northstar.example/control/{index:02d}",
+                        sha256=hashlib.sha256(title.encode()).hexdigest(),
+                        notes="Fictional evidence reference for the seeded workspace.",
+                    )
+                )
+
+        domain_rows = {
+            "cloud": [
+                "Public object storage access",
+                "Unencrypted production database",
+                "Overly permissive workload role",
+                "Unrestricted inbound security group",
+                "Cloud audit retention below policy",
+                "Unmanaged public compute endpoint",
+                "Cross-account snapshot sharing",
+                "Unrotated service credential",
+                "Disabled threat detection region",
+                "Unrestricted serverless egress",
+            ],
+            "identity": [
+                "Privileged account without phishing-resistant MFA",
+                "Dormant administrator account",
+                "Legacy authentication still enabled",
+                "Service principal has broad directory access",
+                "Unusual sign-in from unmanaged device",
+                "Excessive OAuth consent permissions",
+                "Stale guest account retains access",
+                "Conditional access policy exception",
+                "High-risk password reset event",
+                "Privileged session outside normal region",
+            ],
+            "vulnerability": [
+                "Critical package in production container",
+                "Unsupported operating system on endpoint",
+                "Internet-facing service missing security patch",
+                "Dependency with known remote exploit",
+                "Outdated TLS library on public gateway",
+                "High-risk kernel vulnerability on server",
+                "Unpatched browser on privileged workstation",
+                "Exposed development dependency dashboard",
+                "Container base image past support date",
+                "Critical library version in build artifact",
+            ],
+            "agent": [
+                "Agent attempted access to restricted data",
+                "Unapproved tool invocation observed",
+                "Prompt injection pattern in retrieved content",
+                "Agent output included sensitive data markers",
+                "Unreviewed model endpoint configured",
+                "Agent used an excessive token budget",
+                "Tool scope exceeds assigned task",
+                "Untrusted plugin requested secret access",
+                "Policy bypass attempt in agent conversation",
+                "Agent audit logging is incomplete",
+            ],
+            "threat": [
+                "Suspicious command-and-control domain",
+                "Known phishing host in message telemetry",
+                "Malware delivery URL reported by feed",
+                "Credential theft infrastructure indicator",
+                "Ransomware staging domain observed",
+                "Botnet callback address in network event",
+                "Lookalike sign-in domain registered",
+                "Malicious file hash in endpoint telemetry",
+                "Exploit delivery host in proxy records",
+                "Threat feed flagged suspicious sender",
+            ],
+        }
+        for domain, titles in domain_rows.items():
+            source, label = FINDING_DOMAINS[domain]
+            for index, title in enumerate(titles, start=1):
+                external_id = f"DEMO-{domain.upper()}-{index:03d}"
+                exists = db.scalar(
+                    select(SecurityFinding.id).where(
+                        SecurityFinding.domain == domain,
+                        SecurityFinding.source == source,
+                        SecurityFinding.external_id == external_id,
+                    )
+                )
+                if exists is not None:
+                    continue
+                status = ("Open", "In progress", "Accepted risk", "Resolved")[(index - 1) % 4]
+                attributes = {"demo": True, "domain_label": label}
+                if domain == "threat":
+                    value = f"indicator-{index:02d}.demo-threat.example"
+                    attributes.update(
+                        {
+                            "value": value,
+                            "indicator_type": "domain",
+                            "confidence": 65 + index * 3,
+                        }
+                    )
+                db.add(
+                    SecurityFinding(
+                        domain=domain,
+                        external_id=external_id,
+                        title=title,
+                        description=f"Fictional {label.lower()} security finding for demo review.",
+                        severity=("Critical", "High", "Medium", "Low")[(index - 1) % 4],
+                        status=status,
+                        source=source,
+                        asset_key=all_assets[(index - 1) % len(all_assets)][0],
+                        owner=("Unassigned", "Cloud team", "Security team", "Platform team")[
+                            (index - 1) % 4
+                        ],
+                        risk_score=95 - index * 4,
+                        attributes=attributes,
+                        first_seen=now - timedelta(days=index),
+                        last_seen=now - timedelta(hours=index),
+                    )
+                )
+
+        integration_providers = [
+            "AWS CloudTrail",
+            "Microsoft Entra ID",
+            "CrowdStrike Falcon",
+            "Microsoft Defender",
+            "Google Cloud Audit Logs",
+            "Wiz CSPM",
+            "Tenable Vulnerability Management",
+            "Okta System Log",
+            "GitHub Audit Log",
+            "AI Gateway Monitor",
+        ]
+        for index, provider in enumerate(integration_providers, start=1):
+            name = f"DEMO-{provider}"
+            if not db.scalar(select(Integration.id).where(Integration.name == name)):
+                demo_digest = hashlib.sha256(f"inactive-demo-key-{index}".encode()).hexdigest()
+                db.add(
+                    Integration(
+                        name=name,
+                        provider=provider,
+                        token_hash=demo_digest,
+                        token_prefix="demo_revoked",
+                        is_active=False,
+                        created_at=now - timedelta(days=index * 2),
+                        last_ingested_at=now - timedelta(hours=index),
+                    )
+                )
+
+        db.flush()
+        incidents = db.scalars(select(Incident).order_by(Incident.incident_key.desc())).all()
+        books = db.scalars(select(ResponsePlaybook).order_by(ResponsePlaybook.key)).all()
+        for index in range(4, 11):
+            key = f"demo_review_{index:02d}"
+            book = db.scalar(select(ResponsePlaybook).where(ResponsePlaybook.key == key))
+            if book is None:
+                book = ResponsePlaybook(
+                    key=key,
+                    name=(
+                        "Email account containment checklist"
+                        if index % 2 == 0
+                        else "Endpoint isolation review checklist"
+                    )
+                    + f" {index:02d}",
+                    description="Fictional manual review steps for a demo incident.",
+                    steps=[
+                        "Confirm the affected account or asset",
+                        "Preserve relevant investigation evidence",
+                        "Get a separate operator approval before containment",
+                        "Record the review and owner follow-up",
+                    ],
+                )
+                db.add(book)
+                books.append(book)
+        db.flush()
+        books = db.scalars(select(ResponsePlaybook).order_by(ResponsePlaybook.key)).all()
+        for index, incident in enumerate(incidents[:20], start=1):
+            event_title = f"Demo investigation update {index:02d}"
+            if not db.scalar(
+                select(IncidentEvent.id).where(
+                    IncidentEvent.incident_id == incident.id,
+                    IncidentEvent.title == event_title,
+                )
+            ):
+                db.add(
+                    IncidentEvent(
+                        incident_id=incident.id,
+                        actor_id=analyst.id,
+                        event_type="note",
+                        title=event_title,
+                        detail=(
+                            "Initial evidence review completed; follow-up assigned to the owner."
+                        ),
+                        created_at=incident.created_at + timedelta(minutes=12),
+                    )
+                )
+            if index <= 10:
+                evidence_title = f"Demo evidence reference {index:02d}"
+                if not db.scalar(
+                    select(IncidentEvidence.id).where(
+                        IncidentEvidence.incident_id == incident.id,
+                        IncidentEvidence.title == evidence_title,
+                    )
+                ):
+                    db.add(
+                        IncidentEvidence(
+                            incident_id=incident.id,
+                            added_by=analyst.id,
+                            evidence_type="link",
+                            title=evidence_title,
+                            source_uri=f"https://evidence.northstar.example/incident/{index:02d}",
+                            sha256=hashlib.sha256(evidence_title.encode()).hexdigest(),
+                            notes="Fictional reference only; no external evidence is linked.",
+                        )
+                    )
+                action_title = f"Demo containment request {index:02d}"
+                if not db.scalar(
+                    select(ResponseAction.id).where(
+                        ResponseAction.incident_id == incident.id,
+                        ResponseAction.action == action_title,
+                    )
+                ):
+                    action_status = ("Pending", "Approved", "Rejected", "Pending", "Approved")[
+                        (index - 1) % 5
+                    ]
+                    db.add(
+                        ResponseAction(
+                            incident_id=incident.id,
+                            requested_by=analyst.id,
+                            decided_by=admin.id if action_status != "Pending" else None,
+                            action=action_title,
+                            scope="Demo-only review scope; no infrastructure action is executed.",
+                            status=action_status,
+                            decision_detail=(
+                                "Reviewed by a separate demo administrator."
+                                if action_status != "Pending"
+                                else ""
+                            ),
+                            created_at=now - timedelta(hours=index),
+                            decided_at=(
+                                now - timedelta(minutes=index * 5)
+                                if action_status != "Pending"
+                                else None
+                            ),
+                        )
+                    )
+                playbook = books[(index - 1) % len(books)]
+                if not db.scalar(
+                    select(PlaybookRun.id).where(
+                        PlaybookRun.incident_id == incident.id,
+                        PlaybookRun.playbook_id == playbook.id,
+                    )
+                ):
+                    run_status = ("Pending approval", "Approved", "Completed", "Rejected")[
+                        (index - 1) % 4
+                    ]
+                    db.add(
+                        PlaybookRun(
+                            playbook_id=playbook.id,
+                            incident_id=incident.id,
+                            requested_by=analyst.id,
+                            decided_by=admin.id if run_status != "Pending approval" else None,
+                            status=run_status,
+                            approval_note=(
+                                "Demo review recorded by a separate approver."
+                                if run_status != "Pending approval"
+                                else ""
+                            ),
+                            created_at=now - timedelta(hours=index),
+                            decided_at=(
+                                now - timedelta(minutes=index * 4)
+                                if run_status != "Pending approval"
+                                else None
+                            ),
+                        )
+                    )
+
+        from .routers.governance import snapshot_data
+
+        db.flush()
+        report_types = ["executive", "incident", "asset-risk", "compliance"]
+        for index in range(1, 11):
+            report_type = report_types[(index - 1) % len(report_types)]
+            title = f"Demo {report_type} snapshot {index:02d}"
+            if not db.scalar(select(ReportSnapshot.id).where(ReportSnapshot.title == title)):
+                db.add(
+                    ReportSnapshot(
+                        report_type=report_type,
+                        title=title,
+                        created_by=admin.id,
+                        data=snapshot_data(report_type, db),
+                        created_at=now - timedelta(hours=index * 3),
+                    )
+                )
+
+        for index in range(1, 21):
+            resource = f"DEMO-DATASET-{index:03d}"
+            if not db.scalar(
+                select(AuditLog.id).where(
+                    AuditLog.action == "demo.dataset_recorded", AuditLog.resource == resource
+                )
+            ):
+                db.add(
+                    AuditLog(
+                        actor_id=admin.id,
+                        action="demo.dataset_recorded",
+                        resource=resource,
+                        created_at=now - timedelta(minutes=index * 9),
                     )
                 )
         db.commit()
     print(
-        f"Processed {len(DEMO_USERS)} fictional demo accounts (four per built-in role) and "
-        f"{len(INCIDENTS)} fictional incidents, {len(DEMO_ALERTS)} alerts, "
-        f"{len(DEMO_ASSETS)} assets and {len(DEMO_ALERTS)} telemetry events."
+        f"Seeded {len(DEMO_USERS)} users, {len(INCIDENTS)} incidents, "
+        f"{len(all_alerts)} alerts, {len(all_assets)} assets, "
+        f"{len(all_alerts)} telemetry events, "
+        f"{sum(len(titles) for titles in domain_rows.values())} findings across five domains, "
+        f"{len(controls)} compliance controls, {len(books)} playbooks, "
+        "10 evidence records, 10 response requests, 10 playbook runs, "
+        "10 saved reports and 10 demo integrations."
     )
     print("All seeded demo accounts use the password you entered.")
     for email, _, role in DEMO_USERS:
