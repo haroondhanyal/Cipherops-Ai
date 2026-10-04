@@ -197,6 +197,12 @@ class Integration(Base):
     last_ingested_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status: Mapped[str] = mapped_column(String(24), default="Waiting", nullable=False)
+    last_error: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    successful_batches: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed_batches: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_event_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class TelemetryEvent(Base):

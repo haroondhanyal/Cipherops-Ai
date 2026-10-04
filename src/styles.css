@@ -88,3 +88,11 @@
 .inline-note-form textarea::placeholder{color:#718697}
 .filters>input{height:34px;min-width:140px;flex:1;border:1px solid #283e4d;background:#091720;color:#dce7f0;border-radius:6px;padding:0 10px;font-size:10px}
 .workflow-list article code{color:#95bdd8;overflow-wrap:anywhere}
+.intel-consent{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:14px;border-color:#59462c;background:linear-gradient(130deg,#211e18,#0d1a22)}
+.intel-consent h2{margin:0;color:#ead8b4;font-size:13px}
+.intel-consent p{max-width:760px;color:#b6a98f;font-size:10px;line-height:1.5;margin:6px 0}
+.intel-consent small{color:#7d91a2;font-size:9px}
+.consent-check{display:flex;align-items:center;gap:8px;max-width:230px;color:#e6d6b6;font-size:10px;line-height:1.5}
+.consent-check input{accent-color:#328cff}
+.integration-diagnostic{margin-bottom:14px}
+@media(max-width:850px){.intel-consent{align-items:flex-start;flex-direction:column;gap:12px}.consent-check{max-width:100%}}

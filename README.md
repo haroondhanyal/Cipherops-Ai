@@ -41,13 +41,14 @@ CipherOps AI is a full-stack security operations center (SOC) workspace. The fro
 | Telemetry and assets | Integration-key ingestion, event deduplication, detection alerts, asset upsert and searchable inventory |
 | Security findings | Cloud, identity, vulnerability, AI-agent and threat-intelligence finding queues with filtering and triage |
 | Threat intelligence | IOC indicators, exact-value matching against telemetry and matched-indicator context on alerts |
+| Threat intelligence enrichment | Analyst-triggered VirusTotal reputation lookup for IPs, domains, URLs and file hashes |
 | Threat hunting | Search normalized telemetry and IOC/rule matches; save personal hunt queries for reuse |
 | Detection engineering | Author event type, severity and summary match rules; simulate against stored telemetry and alert on ingest matches |
 | Response workflows | Separate-operator approval gates, manual playbook checklists and cross-incident automation history |
 | Governance | Compliance controls and evidence, point-in-time report snapshots and CSV downloads |
 | Identity and access | JWT sessions, role-based access control (RBAC), optional TOTP MFA and optional OIDC SSO |
 | Account self-service | Optional signup with profile photo/details, password visibility controls, password recovery and profile editing |
-| Operations | Audit history, API liveness/readiness endpoints, baseline security response headers and role-aware global search |
+| Operations | Audit history, API liveness/readiness, integration ingest health/diagnostics and role-aware global search |
 
 The app shell and page modules are separate from shared API helpers. The backend is organized into route modules. Seven workstreams and shared-contract rules are documented in [docs_DEVELOPMENT.md](./docs_DEVELOPMENT.md).
 
@@ -163,6 +164,7 @@ Open the Vite URL, normally `http://localhost:5173`, and sign in with the accoun
 | `ALLOW_PUBLIC_SIGNUP` | `backend/.env` | Enables registration; accounts start with `SOC Analyst` permissions while requested roles await administrator approval |
 | `PASSWORD_RESET_DEV_MODE` | `backend/.env` | Returns a reset link only when the configured frontend is loopback; local development only |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_STARTTLS` | `backend/.env` | Optional mail delivery for password recovery |
+| `VIRUSTOTAL_API_KEY`, `VIRUSTOTAL_TIMEOUT_SECONDS` | `backend/.env` | Optional server-only key and timeout for manual VirusTotal reputation lookups |
 
 Never commit populated `.env` files, integration keys, JWT secrets or provider credentials. The supplied `.env.example` files contain placeholders only.
 
@@ -206,12 +208,13 @@ All operational endpoints are versioned under `/api/v1`. Use the interactive doc
 | Incidents | `/incidents` | Incident lifecycle, notes, evidence, analysis and response approvals |
 | Alerts and assets | `/alerts`, `/assets` | Alert triage and asset inventory |
 | Telemetry and integrations | `/telemetry`, `/integrations` | Ingestion, integration-key lifecycle and operational summaries |
+| Threat intelligence enrichment | `/threat-intel` | Manual VirusTotal lookups with explicit acknowledgement before external sharing |
 | Security domains | `/findings` | Normalized domain findings and threat indicators |
 | Response workflows | `/automation`, incident playbook routes | Approval-gated manual automation/playbook history |
 | Governance | `/compliance`, `/reports` | Control/evidence tracking and saved report snapshots/CSV |
 | Administration | `/admin` | User/role management and audit history |
 
-Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0007_hunting_collaboration_rules.py`.
+Route-level permission keys are enforced server-side. UI visibility does not replace API authorization. Database schema updates are delivered through Alembic; the current migration head is `0008_integration_health.py`.
 
 ## Security and operational boundaries
 
@@ -221,6 +224,8 @@ Route-level permission keys are enforced server-side. UI visibility does not rep
 - Integration ingestion keys are generated for each source and shown once. Revoke compromised or retired keys from the Integrations screen.
 - Incident response approvals prevent an operator from approving their own request. Approval records and playbook checklists do not themselves execute containment.
 - Threat correlation is exact IOC-value matching after normalization; it is not an external feed subscription, reputation lookup or fuzzy domain/IP matching service.
+- VirusTotal enrichment is optional and manual. VirusTotal documents that queried IoCs are added to its dataset and may be available to its community; the UI requires analyst acknowledgement and warns against confidential, sensitive or personal data. See [VirusTotal domain report and data handling notice](https://docs.virustotal.com/reference/domain-info).
+- Integration health records authenticated ingest successes and failures, last batch counts and diagnostic details. A source becomes stale after 15 minutes without a successful ingest. Malformed requests rejected before route validation cannot be attributed to a particular integration.
 - Detection rules currently use explicit event type, minimum severity and summary-substring conditions. They are not Sigma/YARA parsers. Mentions are recorded with incident notes; notifications are not sent by this release.
 - Dashboard insights are deterministic summaries, not generated by an LLM. The map shows only source events that supply coordinates.
 - For production, use HTTPS, a managed secret store, restricted CORS, database backups, monitoring, secret rotation and organization-approved source collectors and execution adapters.

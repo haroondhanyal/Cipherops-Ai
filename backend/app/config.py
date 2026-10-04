@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from_email: str | None = None
     smtp_starttls: bool = True
+    virustotal_api_key: str | None = None
+    virustotal_timeout_seconds: float = Field(default=8.0, ge=2.0, le=30.0)
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

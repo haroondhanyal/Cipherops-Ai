@@ -140,6 +140,18 @@ class DetectionRuleUpdate(BaseModel):
     enabled: bool | None = None
 
 
+class ThreatIntelLookup(BaseModel):
+    indicator_type: str = Field(pattern="^(ip|domain|url|hash)$")
+    value: str = Field(min_length=1, max_length=2048)
+    acknowledge_community_sharing: bool
+
+    @model_validator(mode="after")
+    def require_external_sharing_acknowledgement(self):
+        if not self.acknowledge_community_sharing:
+            raise ValueError("Confirm external community sharing before lookup")
+        return self
+
+
 class AlertUpdate(BaseModel):
     status: str | None = Field(
         default=None, pattern="^(New|Acknowledged|Investigating|Resolved|Suppressed)$"

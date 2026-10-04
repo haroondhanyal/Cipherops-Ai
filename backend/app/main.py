@@ -18,6 +18,7 @@ from .routers import (
     incidents,
     platform,
     search,
+    threat_intel,
     workflows,
 )
 
@@ -243,3 +244,4 @@ app.include_router(workflows.router)
 app.include_router(governance.router)
 app.include_router(search.router)
 app.include_router(hunting.router)
+app.include_router(threat_intel.router)
